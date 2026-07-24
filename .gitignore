@@ -34,6 +34,16 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Hardhat nested project
+/hardhat/node_modules
+/hardhat/artifacts
+/hardhat/cache
+/hardhat/dist
+/hardhat/coverage
+/hardhat/types
+/hardhat/.gas-snapshot
+/hardhat/snapshots
+
 # vercel
 .vercel
 

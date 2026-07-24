@@ -1,0 +1,144 @@
+{
+  "_format": "hh3-artifact-1",
+  "contractName": "DailyCheckIn",
+  "sourceName": "contracts/DailyCheckIn.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "initialOwner",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "CheckedIn",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "checkIn",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "lastCheckIn",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600e575f5ffd5b506040516103c23803806103c2833981016040819052602b9160b4565b806001600160a01b038116605857604051631e4fbdf760e01b81525f600482015260240160405180910390fd5b605f816065565b505060df565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b5f6020828403121560c3575f5ffd5b81516001600160a01b038116811460d8575f5ffd5b9392505050565b6102d6806100ec5f395ff3fe608060405234801561000f575f5ffd5b5060043610610055575f3560e01c8063183ff08514610059578063715018a6146100635780638da5cb5b1461006b578063ef6fdb1c1461008a578063f2fde38b146100b7575b5f5ffd5b6100616100ca565b005b610061610183565b5f546040516001600160a01b0390911681526020015b60405180910390f35b6100a961009836600461024e565b60016020525f908152604090205481565b604051908152602001610081565b6100616100c536600461024e565b610196565b335f908152600160205260409020546100e6906201518061027b565b42101561013a5760405162461bcd60e51b815260206004820152601860248201527f416c726561647920636865636b656420696e20746f646179000000000000000060448201526064015b60405180910390fd5b335f81815260016020908152604091829020429081905591519182527fdddb6e14f7f2101397a6526aab95e964de7f1f44ed06aa47a1c9a0e6b9924456910160405180910390a2565b61018b6101d3565b6101945f6101ff565b565b61019e6101d3565b6001600160a01b0381166101c757604051631e4fbdf760e01b81525f6004820152602401610131565b6101d0816101ff565b50565b5f546001600160a01b031633146101945760405163118cdaa760e01b8152336004820152602401610131565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b5f6020828403121561025e575f5ffd5b81356001600160a01b0381168114610274575f5ffd5b9392505050565b8082018082111561029a57634e487b7160e01b5f52601160045260245ffd5b9291505056fea2646970667358221220f1bca64eddeec794d4c58abc27074530114aa1d9edb6deeb7dbe7376ca87890864736f6c634300081c0033",
+  "deployedBytecode": "0x608060405234801561000f575f5ffd5b5060043610610055575f3560e01c8063183ff08514610059578063715018a6146100635780638da5cb5b1461006b578063ef6fdb1c1461008a578063f2fde38b146100b7575b5f5ffd5b6100616100ca565b005b610061610183565b5f546040516001600160a01b0390911681526020015b60405180910390f35b6100a961009836600461024e565b60016020525f908152604090205481565b604051908152602001610081565b6100616100c536600461024e565b610196565b335f908152600160205260409020546100e6906201518061027b565b42101561013a5760405162461bcd60e51b815260206004820152601860248201527f416c726561647920636865636b656420696e20746f646179000000000000000060448201526064015b60405180910390fd5b335f81815260016020908152604091829020429081905591519182527fdddb6e14f7f2101397a6526aab95e964de7f1f44ed06aa47a1c9a0e6b9924456910160405180910390a2565b61018b6101d3565b6101945f6101ff565b565b61019e6101d3565b6001600160a01b0381166101c757604051631e4fbdf760e01b81525f6004820152602401610131565b6101d0816101ff565b50565b5f546001600160a01b031633146101945760405163118cdaa760e01b8152336004820152602401610131565b5f80546001600160a01b038381166001600160a01b0319831681178455604051919092169283917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e09190a35050565b5f6020828403121561025e575f5ffd5b81356001600160a01b0381168114610274575f5ffd5b9392505050565b8082018082111561029a57634e487b7160e01b5f52601160045260245ffd5b9291505056fea2646970667358221220f1bca64eddeec794d4c58abc27074530114aa1d9edb6deeb7dbe7376ca87890864736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {},
+  "immutableReferences": {},
+  "inputSourceName": "project/contracts/DailyCheckIn.sol",
+  "buildInfoId": "solc-0_8_28-541890460e33bdd52fec4514088c01010f702a45"
+}

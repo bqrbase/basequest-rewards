@@ -4,6 +4,7 @@ import CommunityQuestCards, {
   filterBuilderQuests,
 } from "@/components/CommunityQuestCards";
 import ConnectWithBuilder from "@/components/ConnectWithBuilder";
+import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import GlassPanel from "@/components/GlassPanel";
 import LevelProgressBar from "@/components/LevelProgressBar";
 import LevelUpCelebration from "@/components/LevelUpCelebration";
@@ -186,6 +187,10 @@ export default function Dashboard() {
             </div>
 
             <div className={ui.gridCards}>
+              <DeployContractQuestCard
+                quest={quests.find((quest) => quest.id === "deploy-contract")}
+                onCompleted={applyServerProgress}
+              />
               {filterBuilderQuests(quests).map((quest) => (
                 <QuestCard
                   key={quest.id}

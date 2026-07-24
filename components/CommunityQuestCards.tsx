@@ -8,6 +8,7 @@ import QuestCard from "@/components/QuestCard";
 import { COMMUNITY_QUESTS } from "@/lib/community-quests";
 import {
   isCommunityEngineQuest,
+  isSpecialBuilderQuest,
   type QuestId,
   type QuestProgress,
   type QuestStatus,
@@ -97,5 +98,8 @@ export default function CommunityQuestCards({
 export function filterBuilderQuests<T extends { id: QuestId }>(
   quests: T[],
 ): T[] {
-  return quests.filter((quest) => !isCommunityEngineQuest(quest.id));
+  return quests.filter(
+    (quest) =>
+      !isCommunityEngineQuest(quest.id) && !isSpecialBuilderQuest(quest.id),
+  );
 }

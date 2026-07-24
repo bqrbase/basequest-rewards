@@ -3,6 +3,7 @@
 import CommunityQuestCards, {
   filterBuilderQuests,
 } from "@/components/CommunityQuestCards";
+import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import PageShell from "@/components/PageShell";
 import QuestCard from "@/components/QuestCard";
 import { useQuestEngine } from "@/hooks/useQuestEngine";
@@ -74,8 +75,12 @@ export default function QuestsPage() {
         {!hydrated ? (
           <QuestsSkeleton />
         ) : (
-          <div className={ui.gridCards}>
-            {filterBuilderQuests(quests).map((quest) => (
+            <div className={ui.gridCards}>
+              <DeployContractQuestCard
+                quest={quests.find((quest) => quest.id === "deploy-contract")}
+                onCompleted={applyServerProgress}
+              />
+              {filterBuilderQuests(quests).map((quest) => (
               <QuestCard
                 key={quest.id}
                 questId={quest.id}

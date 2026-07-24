@@ -4,7 +4,8 @@ export type QuestId =
   | "build-streak"
   | "explore-base"
   | "follow-x"
-  | "follow-farcaster";
+  | "follow-farcaster"
+  | "deploy-contract";
 
 const QUEST_IDS: QuestId[] = [
   "daily-check-in",
@@ -13,6 +14,7 @@ const QUEST_IDS: QuestId[] = [
   "explore-base",
   "follow-x",
   "follow-farcaster",
+  "deploy-contract",
 ];
 
 /** Quests shown in Community section (excluded from Builder lists). */
@@ -21,8 +23,15 @@ export const COMMUNITY_ENGINE_QUEST_IDS: QuestId[] = [
   "follow-farcaster",
 ];
 
+/** Builder quests rendered by dedicated UI (excluded from generic builder map). */
+export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = ["deploy-contract"];
+
 export function isCommunityEngineQuest(questId: QuestId): boolean {
   return COMMUNITY_ENGINE_QUEST_IDS.includes(questId);
+}
+
+export function isSpecialBuilderQuest(questId: QuestId): boolean {
+  return SPECIAL_BUILDER_QUEST_IDS.includes(questId);
 }
 
 export function parseQuestIds(ids: unknown): QuestId[] {
@@ -91,6 +100,10 @@ const QUEST_ENGINE_METADATA: Record<
     prerequisites: [],
     ctaAvailable: "Follow @hqc",
   },
+  "deploy-contract": {
+    prerequisites: [],
+    ctaAvailable: "Deploy Contract",
+  },
 };
 
 export const QUEST_DEFINITIONS: QuestDefinition[] = [
@@ -140,6 +153,14 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
       "Follow @hqc on Farcaster and join the BaseQuest community.",
     rewardXp: 25,
     ...QUEST_ENGINE_METADATA["follow-farcaster"],
+  },
+  {
+    id: "deploy-contract",
+    title: "Deploy Contract",
+    description:
+      "Choose a contract template and deploy your first contract on Base.",
+    rewardXp: 50,
+    ...QUEST_ENGINE_METADATA["deploy-contract"],
   },
 ];
 
