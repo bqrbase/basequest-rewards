@@ -3,9 +3,11 @@
 import GlassPanel from "@/components/GlassPanel";
 import { DATA_SUFFIX } from "@/lib/builderCode";
 import {
-  deployHelloBase,
+  claimBaseQuestBadge,
+  getBaseQuestBadgeAddress,
   getBaseScanAddressUrl,
-} from "@/lib/contracts/deploy/helloBase";
+  getBaseScanNftUrl,
+} from "@/lib/contracts/claim/baseQuestBadge";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
 import { useEffect, useId, useState } from "react";
@@ -18,79 +20,48 @@ import {
   useSwitchChain,
 } from "wagmi";
 
-export type DeployContractTemplateId =
-  | "hello-base"
-  | "storage"
-  | "erc20";
-
-type DeployContractTemplate = {
-  id: DeployContractTemplateId;
-  title: string;
-  description: string;
-  enabled: boolean;
-};
-
-const TEMPLATES: DeployContractTemplate[] = [
-  {
-    id: "hello-base",
-    title: "Hello Base",
-    description: "A simple starter contract to deploy your first contract on Base.",
-    enabled: true,
-  },
-  {
-    id: "storage",
-    title: "Storage Contract",
-    description: "Store and update a value onchain.",
-    enabled: false,
-  },
-  {
-    id: "erc20",
-    title: "ERC20 Token",
-    description: "Deploy a basic ERC20 token on Base.",
-    enabled: false,
-  },
-];
-
-type DeployContractModalProps = {
+type ClaimNftModalProps = {
   open: boolean;
   onClose: () => void;
   questStatus: QuestStatus;
   onQuestCompleted: (progress: QuestProgress) => void;
 };
 
-type ModalStep = "templates" | "hello-base" | "success";
+type ModalStep = "claim" | "success";
 
-type DeploySuccessState = {
+type ClaimSuccessState = {
   contractAddress: Address;
+  tokenId: string;
   txHash: Hash;
   chainId: number;
 };
 
 /**
- * Deploy Contract quest modal — template picker + Hello Base deploy flow.
+ * Claim NFT quest modal — mint BaseQuest Builder Badge and show confirmation.
  */
-export default function DeployContractModal({
+export default function ClaimNftModal({
   open,
   onClose,
   questStatus,
   onQuestCompleted,
-}: DeployContractModalProps) {
+}: ClaimNftModalProps) {
   const titleId = useId();
   const config = useConfig();
   const chainId = useChainId();
   const { address, status: walletStatus } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
+  const badgeAddress = getBaseQuestBadgeAddress();
 
-  const [step, setStep] = useState<ModalStep>("templates");
-  const [isDeploying, setIsDeploying] = useState(false);
+  const [step, setStep] = useState<ModalStep>("claim");
+  const [isClaiming, setIsClaiming] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [success, setSuccess] = useState<DeploySuccessState | null>(null);
+  const [success, setSuccess] = useState<ClaimSuccessState | null>(null);
 
   useEffect(() => {
     if (!open) {
-      setStep("templates");
-      setIsDeploying(false);
+      setStep("claim");
+      setIsClaiming(false);
       setErrorMessage(null);
       setSuccess(null);
       return;
@@ -100,7 +71,7 @@ export default function DeployContractModal({
     document.body.style.overflow = "hidden";
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !isDeploying) {
+      if (event.key === "Escape" && !isClaiming) {
         onClose();
       }
     }
@@ -110,37 +81,43 @@ export default function DeployContractModal({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, onClose, isDeploying]);
+  }, [open, onClose, isClaiming]);
 
-  async function handleDeploy() {
-    if (!address || !isWalletConnected || isDeploying) {
-      setErrorMessage("Connect your wallet to deploy.");
+  async function handleClaim() {
+    if (!address || !isWalletConnected || isClaiming) {
+      setErrorMessage("Connect your wallet to claim.");
+      return;
+    }
+
+    if (questStatus === "locked") {
+      setErrorMessage("Complete the Deploy Contract quest first.");
       return;
     }
 
     if (questStatus === "completed") {
-      setErrorMessage("You already completed the Deploy Contract quest.");
+      setErrorMessage("You already completed the Claim NFT quest.");
       return;
     }
 
-    setIsDeploying(true);
+    setIsClaiming(true);
     setErrorMessage(null);
 
     try {
-      let deployChainId = chainId;
-      if (deployChainId !== base.id) {
+      let claimChainId = chainId;
+      if (claimChainId !== base.id) {
         try {
           await switchChainAsync({ chainId: base.id });
-          deployChainId = base.id;
+          claimChainId = base.id;
         } catch {
-          setErrorMessage("Please switch your wallet to Base to deploy.");
+          setErrorMessage("Please switch your wallet to Base to claim.");
           return;
         }
       }
 
-      const result = await deployHelloBase({
+      const result = await claimBaseQuestBadge({
         config,
-        chainId: deployChainId,
+        chainId: claimChainId,
+        walletAddress: address,
         dataSuffix: DATA_SUFFIX,
       });
 
@@ -149,15 +126,14 @@ export default function DeployContractModal({
         return;
       }
 
-      const saveResponse = await fetch("/api/contracts/save", {
+      const saveResponse = await fetch("/api/nfts/claim/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           wallet: address,
           contractAddress: result.contractAddress,
+          tokenId: result.tokenId,
           txHash: result.txHash,
-          chainId: result.chainId,
-          templateId: "hello-base",
         }),
       });
 
@@ -174,6 +150,7 @@ export default function DeployContractModal({
 
       setSuccess({
         contractAddress: result.contractAddress,
+        tokenId: result.tokenId,
         txHash: result.txHash,
         chainId: result.chainId,
       });
@@ -181,7 +158,7 @@ export default function DeployContractModal({
 
       if (!saveResponse.ok || !saveJson.success) {
         console.error(
-          "[DeployContractModal] /api/contracts/save failed:",
+          "[ClaimNftModal] /api/nfts/claim/save failed:",
           saveJson,
         );
         const supabaseParts = [
@@ -196,22 +173,20 @@ export default function DeployContractModal({
         setErrorMessage(
           supabaseParts.length > 0
             ? supabaseParts.join(" | ")
-            : "Contract deployed onchain, but saving failed.",
+            : "NFT minted onchain, but saving failed.",
         );
         return;
       }
 
-      const completeResponse = await fetch(
-        "/api/quests/deploy-contract/complete",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            wallet: address,
-            contractAddress: result.contractAddress,
-          }),
-        },
-      );
+      const completeResponse = await fetch("/api/quests/claim-nft/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wallet: address,
+          contractAddress: result.contractAddress,
+          tokenId: result.tokenId,
+        }),
+      });
 
       const completeJson = (await completeResponse.json()) as {
         success?: boolean;
@@ -226,15 +201,15 @@ export default function DeployContractModal({
 
       setErrorMessage(
         completeJson.error ||
-          "Contract saved, but quest completion failed. Refresh and check progress.",
+          "NFT saved, but quest completion failed. Refresh and check progress.",
       );
     } catch (error) {
-      console.error("[DeployContractModal] deploy failed:", error);
+      console.error("[ClaimNftModal] claim failed:", error);
       setErrorMessage(
         error instanceof Error ? error.message : String(error),
       );
     } finally {
-      setIsDeploying(false);
+      setIsClaiming(false);
     }
   }
 
@@ -242,8 +217,18 @@ export default function DeployContractModal({
     return null;
   }
 
-  const explorerUrl = success
+  const explorerAddressUrl = success
     ? getBaseScanAddressUrl(success.contractAddress, success.chainId)
+    : badgeAddress
+      ? getBaseScanAddressUrl(badgeAddress, chainId || base.id)
+      : null;
+
+  const explorerNftUrl = success
+    ? getBaseScanNftUrl(
+        success.contractAddress,
+        success.tokenId,
+        success.chainId,
+      )
     : null;
 
   return (
@@ -255,33 +240,35 @@ export default function DeployContractModal({
     >
       <button
         type="button"
-        aria-label="Close deploy contract modal"
+        aria-label="Close claim NFT modal"
         className="absolute inset-0 bg-[#050814]/70 backdrop-blur-sm"
         onClick={() => {
-          if (!isDeploying) {
+          if (!isClaiming) {
             onClose();
           }
         }}
       />
 
       <GlassPanel className="relative z-10 w-full max-w-lg p-5 sm:p-6">
-        {step === "templates" ? (
+        {step === "claim" ? (
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className={ui.sectionHeading}>Deploy</p>
+                <p className={ui.sectionHeading}>Claim</p>
                 <h2
                   id={titleId}
                   className="mt-1.5 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl"
                 >
-                  Deploy Contract
+                  Claim NFT
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  Choose a contract template to continue.
+                  Mint your BaseQuest Builder Badge (BQB) on Base. Each wallet
+                  can claim only one NFT.
                 </p>
               </div>
               <button
                 type="button"
+                disabled={isClaiming}
                 onClick={onClose}
                 className={`${ui.secondaryButton} shrink-0 px-3 py-2 text-xs`}
               >
@@ -289,98 +276,46 @@ export default function DeployContractModal({
               </button>
             </div>
 
-            <div className="mt-5 space-y-3">
-              {TEMPLATES.map((template) => {
-                if (!template.enabled) {
-                  return (
-                    <div
-                      key={template.id}
-                      className={`${ui.glassRow} flex cursor-not-allowed items-start justify-between gap-3 p-4 opacity-60`}
-                    >
-                      <div className="min-w-0">
-                        <p className="font-sans text-sm font-semibold text-white sm:text-base">
-                          {template.title}
-                        </p>
-                        <p className="mt-1 text-xs leading-relaxed text-white/45 sm:text-sm">
-                          {template.description}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-badge border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest text-white/55">
-                        Coming Soon
-                      </span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => {
-                      setErrorMessage(null);
-                      setStep("hello-base");
-                    }}
-                    className={`${ui.glassRow} flex w-full items-start justify-between gap-3 p-4 text-left`}
+            <div className={`${ui.glassRow} mt-5 space-y-3 p-4`}>
+              <div>
+                <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/45">
+                  NFT
+                </p>
+                <p className="mt-2 font-sans text-base font-semibold text-white">
+                  BaseQuest Builder Badge
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-white/55">
+                  Symbol: BQB · One mint per wallet
+                </p>
+              </div>
+              {badgeAddress ? (
+                <div>
+                  <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/45">
+                    Contract
+                  </p>
+                  <p
+                    className="mt-1 break-all font-mono text-sm text-cyan-100"
+                    title={badgeAddress}
                   >
-                    <div className="min-w-0">
-                      <p className="font-sans text-sm font-semibold text-white sm:text-base">
-                        {template.title}
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-white/55 sm:text-sm">
-                        {template.description}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-badge border border-cyan-300/40 bg-cyan-500/15 px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest text-cyan-100">
-                      Available
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : null}
-
-        {step === "hello-base" ? (
-          <>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className={ui.sectionHeading}>Hello Base</p>
-                <h2
-                  id={titleId}
-                  className="mt-1.5 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl"
-                >
-                  Deployment Flow
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  Deploy the Hello Base contract with your connected wallet on
-                  Base.
+                    {formatWalletAddress(badgeAddress)}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-rose-300/90">
+                  Badge contract address is not configured.
                 </p>
-              </div>
-              <button
-                type="button"
-                disabled={isDeploying}
-                onClick={onClose}
-                className={`${ui.secondaryButton} shrink-0 px-3 py-2 text-xs`}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className={`${ui.glassRow} mt-5 p-4`}>
-              <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/45">
-                Template
-              </p>
-              <p className="mt-2 font-sans text-base font-semibold text-white">
-                Hello Base
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-white/55">
-                message = &quot;Built on BaseQuest Rewards&quot;
-              </p>
+              )}
             </div>
 
             {!isWalletConnected ? (
               <p className="mt-4 text-center text-xs text-rose-300/90">
-                Connect your wallet to deploy.
+                Connect your wallet to claim.
+              </p>
+            ) : null}
+
+            {questStatus === "locked" ? (
+              <p className="mt-4 text-center text-xs text-amber-200/80">
+                Complete Deploy Contract to unlock this quest.
               </p>
             ) : null}
 
@@ -391,38 +326,41 @@ export default function DeployContractModal({
             ) : null}
 
             <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-              <button
-                type="button"
-                disabled={isDeploying}
-                onClick={() => {
-                  setErrorMessage(null);
-                  setStep("templates");
-                }}
-                className={`${ui.secondaryButton} w-full sm:flex-1`}
-              >
-                Back to templates
-              </button>
+              {explorerAddressUrl ? (
+                <a
+                  href={explorerAddressUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${ui.secondaryButton} w-full sm:flex-1`}
+                >
+                  View contract
+                </a>
+              ) : null}
               <button
                 type="button"
                 disabled={
-                  isDeploying ||
+                  isClaiming ||
                   !isWalletConnected ||
-                  questStatus === "completed"
+                  !badgeAddress ||
+                  questStatus !== "available"
                 }
-                onClick={() => void handleDeploy()}
+                onClick={() => void handleClaim()}
                 className={`${
-                  isDeploying ||
+                  isClaiming ||
                   !isWalletConnected ||
-                  questStatus === "completed"
+                  !badgeAddress ||
+                  questStatus !== "available"
                     ? `${ui.secondaryButton} cursor-not-allowed opacity-70`
                     : ui.primaryButton
                 } w-full sm:flex-1`}
               >
-                {isDeploying
-                  ? "Deploying…"
+                {isClaiming
+                  ? "Minting…"
                   : questStatus === "completed"
                     ? "Already Completed"
-                    : "Deploy"}
+                    : questStatus === "locked"
+                      ? "Locked"
+                      : "Claim NFT"}
               </button>
             </div>
           </>
@@ -437,10 +375,10 @@ export default function DeployContractModal({
                   id={titleId}
                   className="mt-1.5 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl"
                 >
-                  Contract Deployed
+                  NFT Claimed
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  Hello Base is live on Base. Your Deploy Contract quest is
+                  Your BaseQuest Builder Badge is minted. The Claim NFT quest is
                   complete.
                 </p>
               </div>
@@ -456,7 +394,7 @@ export default function DeployContractModal({
             <div className={`${ui.glassRow} mt-5 space-y-3 p-4`}>
               <div>
                 <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/45">
-                  Contract Address
+                  NFT Contract
                 </p>
                 <p
                   className="mt-1 break-all font-mono text-sm text-cyan-100"
@@ -468,9 +406,17 @@ export default function DeployContractModal({
                   {success.contractAddress}
                 </p>
               </div>
-              {explorerUrl ? (
+              <div>
+                <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/45">
+                  Token ID
+                </p>
+                <p className="mt-1 font-mono text-sm text-white">
+                  {success.tokenId}
+                </p>
+              </div>
+              {explorerNftUrl || explorerAddressUrl ? (
                 <a
-                  href={explorerUrl}
+                  href={explorerNftUrl ?? explorerAddressUrl ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${ui.secondaryButton} inline-flex w-full items-center justify-center`}

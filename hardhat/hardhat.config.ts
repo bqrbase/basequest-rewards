@@ -36,5 +36,12 @@ export default defineConfig({
       url: configVariable("BASE_SEPOLIA_RPC_URL"),
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
+    base: {
+      type: "http",
+      chainType: "op",
+      // Set in .env — used only when running deploy scripts on Base Mainnet.
+      url: configVariable("BASE_RPC_URL"),
+      accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
+    },
   },
 });

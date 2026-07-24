@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { logSupabaseError } from "@/lib/supabase/errors";
 
 /**
@@ -14,15 +14,8 @@ import { logSupabaseError } from "@/lib/supabase/errors";
  *   created_at timestamptz not null default now()
  * );
  *
- * create index if not exists deployed_contracts_wallet_idx
- *   on deployed_contracts (wallet_address);
- *
- * -- App uses the anon key (no Supabase Auth session). If RLS is on, allow inserts:
- * alter table deployed_contracts enable row level security;
- * create policy "Allow anon insert deployed_contracts"
- *   on deployed_contracts for insert to anon with check (true);
- * create policy "Allow anon select deployed_contracts"
- *   on deployed_contracts for select to anon using (true);
+ * Inserts must use the service-role admin client (see lib/supabase/admin.ts)
+ * so RLS does not block server-side writes.
  */
 
 export type DeployedContractRow = {
@@ -81,18 +74,22 @@ export function extractSupabaseError(error: unknown): SupabaseInsertErrorInfo {
   };
 }
 
+/**
+ * Insert a deployed contract row using the service-role admin client.
+ * Server-only — never call from the browser.
+ */
 export async function saveDeployedContract(
   input: SaveDeployedContractInput,
-): Promise<DeployedContractRow | null> {
-  const supabase = getSupabaseClient();
+): Promise<DeployedContractRow> {
+  const supabase = getSupabaseAdminClient();
   if (!supabase) {
-    logSupabaseError(
-      "saveDeployedContract",
-      "client unavailable",
-      new Error("Supabase client is not configured"),
-      { walletAddress: input.walletAddress },
+    const configError = new Error(
+      "Supabase admin client is not configured (SUPABASE_SERVICE_ROLE_KEY)",
     );
-    return null;
+    logSupabaseError("saveDeployedContract", "admin unavailable", configError, {
+      walletAddress: input.walletAddress,
+    });
+    throw configError;
   }
 
   const payload = {
@@ -103,7 +100,7 @@ export async function saveDeployedContract(
     chain_id: input.chainId,
   };
 
-  console.error("[saveDeployedContract] insert payload:", payload);
+  console.error("[saveDeployedContract] insert payload (admin):", payload);
 
   const { data, error } = await supabase
     .from("deployed_contracts")

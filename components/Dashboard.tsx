@@ -4,6 +4,7 @@ import CommunityQuestCards, {
   filterBuilderQuests,
 } from "@/components/CommunityQuestCards";
 import ConnectWithBuilder from "@/components/ConnectWithBuilder";
+import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import GlassPanel from "@/components/GlassPanel";
 import LevelProgressBar from "@/components/LevelProgressBar";
@@ -189,6 +190,10 @@ export default function Dashboard() {
             <div className={ui.gridCards}>
               <DeployContractQuestCard
                 quest={quests.find((quest) => quest.id === "deploy-contract")}
+                onCompleted={applyServerProgress}
+              />
+              <ClaimNftQuestCard
+                quest={quests.find((quest) => quest.id === "claim-nft")}
                 onCompleted={applyServerProgress}
               />
               {filterBuilderQuests(quests).map((quest) => (

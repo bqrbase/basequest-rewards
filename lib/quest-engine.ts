@@ -5,7 +5,8 @@ export type QuestId =
   | "explore-base"
   | "follow-x"
   | "follow-farcaster"
-  | "deploy-contract";
+  | "deploy-contract"
+  | "claim-nft";
 
 const QUEST_IDS: QuestId[] = [
   "daily-check-in",
@@ -15,6 +16,7 @@ const QUEST_IDS: QuestId[] = [
   "follow-x",
   "follow-farcaster",
   "deploy-contract",
+  "claim-nft",
 ];
 
 /** Quests shown in Community section (excluded from Builder lists). */
@@ -24,7 +26,10 @@ export const COMMUNITY_ENGINE_QUEST_IDS: QuestId[] = [
 ];
 
 /** Builder quests rendered by dedicated UI (excluded from generic builder map). */
-export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = ["deploy-contract"];
+export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = [
+  "deploy-contract",
+  "claim-nft",
+];
 
 export function isCommunityEngineQuest(questId: QuestId): boolean {
   return COMMUNITY_ENGINE_QUEST_IDS.includes(questId);
@@ -104,6 +109,10 @@ const QUEST_ENGINE_METADATA: Record<
     prerequisites: [],
     ctaAvailable: "Deploy Contract",
   },
+  "claim-nft": {
+    prerequisites: ["deploy-contract"],
+    ctaAvailable: "Claim NFT",
+  },
 };
 
 export const QUEST_DEFINITIONS: QuestDefinition[] = [
@@ -161,6 +170,14 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
       "Choose a contract template and deploy your first contract on Base.",
     rewardXp: 50,
     ...QUEST_ENGINE_METADATA["deploy-contract"],
+  },
+  {
+    id: "claim-nft",
+    title: "Claim NFT",
+    description:
+      "Mint your BaseQuest Builder Badge NFT after deploying your first contract.",
+    rewardXp: 50,
+    ...QUEST_ENGINE_METADATA["claim-nft"],
   },
 ];
 

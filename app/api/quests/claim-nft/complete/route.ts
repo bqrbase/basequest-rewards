@@ -18,12 +18,13 @@ import {
 type CompleteBody = {
   wallet?: string;
   contractAddress?: string;
+  tokenId?: string;
 };
 
 /**
- * POST /api/quests/deploy-contract/complete
- * Completes the deploy-contract quest and awards XP.
- * Contract persistence is handled by POST /api/contracts/save.
+ * POST /api/quests/claim-nft/complete
+ * Completes the claim-nft quest and awards XP.
+ * NFT persistence is handled by POST /api/nfts/claim/save.
  */
 export async function POST(request: Request) {
   try {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
 
     const wallet = body.wallet;
     const contractAddress = body.contractAddress;
+    const tokenId = body.tokenId;
 
     if (!wallet || !isValidWalletAddress(wallet)) {
       return NextResponse.json(
@@ -59,23 +61,29 @@ export async function POST(request: Request) {
           completedQuestIds: [],
         };
 
-    const alreadyCompleted =
-      progress.completedQuestIds.includes("deploy-contract");
+    if (!progress.completedQuestIds.includes("deploy-contract")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "deploy_contract_required",
+        },
+        { status: 400 },
+      );
+    }
+
+    const alreadyCompleted = progress.completedQuestIds.includes("claim-nft");
 
     if (!alreadyCompleted) {
       progress = completeOneTimeQuest(
         progress,
-        "deploy-contract",
+        "claim-nft",
         QUEST_DEFINITIONS,
       );
 
       try {
         await saveUserProgress(walletAddress, progress);
       } catch (progressError) {
-        console.error(
-          "[deploy-contract/complete] saveUserProgress",
-          progressError,
-        );
+        console.error("[claim-nft/complete] saveUserProgress", progressError);
       }
     }
 
@@ -83,6 +91,7 @@ export async function POST(request: Request) {
       success: true,
       alreadyCompleted,
       contractAddress: contractAddress?.toLowerCase() ?? null,
+      tokenId: tokenId ?? null,
       progress: {
         totalXp: progress.totalXp,
         streak: progress.streak,
@@ -92,7 +101,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const info = extractSupabaseError(error);
-    console.error("[deploy-contract/complete]", {
+    console.error("[claim-nft/complete]", {
       code: info.code,
       message: info.message,
       details: info.details,

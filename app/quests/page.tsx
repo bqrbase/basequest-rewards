@@ -3,6 +3,7 @@
 import CommunityQuestCards, {
   filterBuilderQuests,
 } from "@/components/CommunityQuestCards";
+import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import PageShell from "@/components/PageShell";
 import QuestCard from "@/components/QuestCard";
@@ -78,6 +79,10 @@ export default function QuestsPage() {
             <div className={ui.gridCards}>
               <DeployContractQuestCard
                 quest={quests.find((quest) => quest.id === "deploy-contract")}
+                onCompleted={applyServerProgress}
+              />
+              <ClaimNftQuestCard
+                quest={quests.find((quest) => quest.id === "claim-nft")}
                 onCompleted={applyServerProgress}
               />
               {filterBuilderQuests(quests).map((quest) => (
