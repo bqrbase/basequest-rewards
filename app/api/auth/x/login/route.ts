@@ -95,16 +95,9 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(authorizeUrl);
   } catch (error) {
-    console.error("[x/login]", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : String(error),
-        stack:
-          process.env.NODE_ENV !== "production"
-            ? error instanceof Error
-              ? error.stack
-              : undefined
-            : undefined,
       },
       { status: 500 },
     );

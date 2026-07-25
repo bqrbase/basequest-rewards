@@ -113,6 +113,9 @@ export async function fetchXAuthenticatedUser(
 
 let cachedTargetUserId: string | null = null;
 
+/**
+ * Resolve @bqrbase user id via X API v2 (app bearer token).
+ */
 export async function fetchTargetXUserId(): Promise<string> {
   if (cachedTargetUserId) {
     return cachedTargetUserId;
@@ -135,14 +138,10 @@ export async function fetchTargetXUserId(): Promise<string> {
   };
 
   if (!response.ok || !json.data?.id) {
-    console.error("[x/api] fetchTargetXUserId full X API response:", {
-      status: response.status,
-      body: json,
-    });
     throw new Error(
       json.errors?.[0]?.detail ||
         json.errors?.[0]?.title ||
-        JSON.stringify(json),
+        `Failed to resolve @${X_TARGET_USERNAME} (HTTP ${response.status})`,
     );
   }
 
@@ -151,111 +150,56 @@ export async function fetchTargetXUserId(): Promise<string> {
 }
 
 /**
- * Returns whether `sourceUserId` follows `targetUserId`.
- * Uses the user-context access token (follows.read).
+ * Real X API v2 verification: does the authenticated user follow @bqrbase?
+ * Uses user.fields=connection_status on the target user lookup (user OAuth token).
+ * No timers / click-wait heuristics.
+ *
+ * Docs: GET /2/users/:id?user.fields=connection_status
  */
 export async function doesUserFollowTarget(params: {
   accessToken: string;
   sourceUserId: string;
   targetUserId: string;
 }): Promise<boolean> {
-  // Preferred relationship lookup (when available on the app's access tier).
-  const relationshipUrl = `${X_API}/2/users/${params.sourceUserId}/following/${params.targetUserId}`;
-  const relationshipResponse = await fetch(relationshipUrl, {
+  void params.sourceUserId;
+
+  const url = new URL(`${X_API}/2/users/${params.targetUserId}`);
+  url.searchParams.set("user.fields", "connection_status,username");
+
+  const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${params.accessToken}`,
     },
     cache: "no-store",
   });
 
-  if (relationshipResponse.ok) {
-    const json = (await relationshipResponse.json()) as {
-      data?: { following?: boolean };
+  const responseText = await response.text();
+  let json: {
+    data?: {
+      id: string;
+      username?: string;
+      connection_status?: string[];
     };
-    if (typeof json.data?.following === "boolean") {
-      return json.data.following;
-    }
-    console.error(
-      "[x/api] relationship probe unexpected X API response:",
-      json,
-    );
-  } else {
-    const body = await relationshipResponse.text();
-    console.error("[x/api] relationship probe full X API response:", {
-      status: relationshipResponse.status,
-      body,
-    });
+    errors?: Array<{ detail?: string; title?: string }>;
+    title?: string;
+    detail?: string;
+  } = {};
+
+  try {
+    json = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    json = {};
   }
 
-  // Fallback: scan following list for the target account.
-  let nextToken: string | undefined;
-  for (let page = 0; page < 10; page += 1) {
-    const url = new URL(
-      `${X_API}/2/users/${params.sourceUserId}/following`,
+  if (!response.ok) {
+    throw new Error(
+      json.errors?.[0]?.detail ||
+        json.detail ||
+        json.title ||
+        `X API follow check failed (HTTP ${response.status})`,
     );
-    url.searchParams.set("max_results", "1000");
-    url.searchParams.set("user.fields", "username");
-    if (nextToken) {
-      url.searchParams.set("pagination_token", nextToken);
-    }
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${params.accessToken}`,
-      },
-      cache: "no-store",
-    });
-
-    const responseText = await response.text();
-    const json = (
-      responseText
-        ? (JSON.parse(responseText) as {
-            data?: Array<{ id: string; username?: string }>;
-            meta?: { next_token?: string; result_count?: number };
-            errors?: Array<{ detail?: string; title?: string }>;
-            status?: number;
-            title?: string;
-            detail?: string;
-          })
-        : {}
-    ) as {
-      data?: Array<{ id: string; username?: string }>;
-      meta?: { next_token?: string; result_count?: number };
-      errors?: Array<{ detail?: string; title?: string }>;
-      status?: number;
-      title?: string;
-      detail?: string;
-    };
-
-    if (!response.ok) {
-      // 404 from relationship-style probes is expected; list errors are hard failures.
-      if (response.status === 404 && page === 0) {
-        return false;
-      }
-      console.error(response.status);
-      console.error(responseText);
-      throw new Error(
-        json.errors?.[0]?.detail ||
-          json.detail ||
-          json.title ||
-          JSON.stringify(json),
-      );
-    }
-
-    const found = (json.data ?? []).some(
-      (user) =>
-        user.id === params.targetUserId ||
-        user.username?.toLowerCase() === X_TARGET_USERNAME.toLowerCase(),
-    );
-    if (found) {
-      return true;
-    }
-
-    nextToken = json.meta?.next_token;
-    if (!nextToken) {
-      break;
-    }
   }
 
-  return false;
+  const statuses = json.data?.connection_status ?? [];
+  return statuses.includes("following");
 }

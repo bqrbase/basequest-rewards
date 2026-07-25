@@ -93,18 +93,15 @@ export async function GET(request: Request) {
         xUserId: xUser.id,
         xUsername: xUser.username,
       });
-    } catch (linkError) {
-      // Session is still valid for verify-follow even if DB link fails
-      // (e.g. missing x_user_id column). Log and continue.
-      console.error("[x/callback] linkXAccountToWallet", linkError);
+    } catch {
+      // Session remains valid for verify-follow even if DB link fails.
     }
 
     return redirectWithParams(request.url, returnTo, {
       x_auth: "connected",
       x_user: xUser.username,
     });
-  } catch (error) {
-    console.error("[x/callback]", error);
+  } catch {
     await clearOAuthPendingCookie();
     return redirectWithParams(request.url, returnTo, {
       x_auth: "error",

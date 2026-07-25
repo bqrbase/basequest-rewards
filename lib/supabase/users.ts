@@ -5,6 +5,7 @@ import {
   type QuestId,
   type QuestProgress,
 } from "@/lib/quest-engine";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { logSupabaseError } from "@/lib/supabase/errors";
 
@@ -20,12 +21,16 @@ import { logSupabaseError } from "@/lib/supabase/errors";
  *   completed_quests jsonb not null default '[]'::jsonb,
  *   x_user_id text,
  *   x_username text,
+ *   twitter_user_id text,
+ *   x_follow_verified_at timestamptz,
  *   created_at timestamptz not null default now(),
  *   updated_at timestamptz not null default now()
  * );
  *
  * alter table users add column if not exists x_user_id text;
  * alter table users add column if not exists x_username text;
+ * alter table users add column if not exists twitter_user_id text;
+ * alter table users add column if not exists x_follow_verified_at timestamptz;
  */
 export type UserRow = {
   id: string;
@@ -36,6 +41,8 @@ export type UserRow = {
   completed_quests: QuestId[] | string[] | null;
   x_user_id?: string | null;
   x_username?: string | null;
+  twitter_user_id?: string | null;
+  x_follow_verified_at?: string | null;
 };
 
 function normalizeWalletAddress(walletAddress: string) {
@@ -168,6 +175,7 @@ export async function linkXAccountToWallet(
     .update({
       x_user_id: account.xUserId,
       x_username: account.xUsername,
+      twitter_user_id: account.xUserId,
       updated_at: new Date().toISOString(),
     })
     .eq("wallet_address", normalizedAddress);
@@ -176,6 +184,55 @@ export async function linkXAccountToWallet(
     logSupabaseError("linkXAccountToWallet", "update", error, {
       walletAddress: normalizedAddress,
       xUserId: account.xUserId,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Persist verified X follow (@bqrbase) for a wallet.
+ * Stores twitter_user_id + verification timestamp.
+ */
+export async function saveXFollowVerification(
+  walletAddress: string,
+  account: {
+    twitterUserId: string;
+    xUsername: string;
+    verifiedAt?: string;
+  },
+): Promise<void> {
+  const normalizedAddress = normalizeWalletAddress(walletAddress);
+  await fetchOrCreateUser(normalizedAddress);
+
+  const supabase = getSupabaseAdminClient() ?? getSupabaseClient();
+  if (!supabase) {
+    const configError = new Error("Supabase is not configured");
+    logSupabaseError(
+      "saveXFollowVerification",
+      "client unavailable",
+      configError,
+      { walletAddress: normalizedAddress },
+    );
+    throw configError;
+  }
+
+  const verifiedAt = account.verifiedAt ?? new Date().toISOString();
+
+  const { error } = await supabase
+    .from("users")
+    .update({
+      twitter_user_id: account.twitterUserId,
+      x_user_id: account.twitterUserId,
+      x_username: account.xUsername,
+      x_follow_verified_at: verifiedAt,
+      updated_at: verifiedAt,
+    })
+    .eq("wallet_address", normalizedAddress);
+
+  if (error) {
+    logSupabaseError("saveXFollowVerification", "update", error, {
+      walletAddress: normalizedAddress,
+      twitterUserId: account.twitterUserId,
     });
     throw error;
   }

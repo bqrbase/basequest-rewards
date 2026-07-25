@@ -7,6 +7,7 @@ import {
 import {
   fetchOrCreateUser,
   saveUserProgress,
+  saveXFollowVerification,
   userRowToProgress,
 } from "@/lib/supabase/users";
 import {
@@ -23,12 +24,26 @@ type VerifyBody = {
   wallet?: string;
 };
 
+function progressPayload(progress: QuestProgress) {
+  return {
+    totalXp: progress.totalXp,
+    streak: progress.streak,
+    lastCheckInDate: progress.lastCheckInDate,
+    completedQuestIds: progress.completedQuestIds,
+  };
+}
+
 /**
  * POST /api/auth/x/verify-follow
  * Body: { wallet: "0x..." }
  *
- * Checks whether the linked X account follows @bqrbase.
- * On success: completes follow-x quest and awards XP via quest engine.
+ * Official X OAuth session + X API v2 follow verification for @bqrbase.
+ * On success:
+ * - stores twitter_user_id + x_follow_verified_at in Supabase
+ * - completes follow-x quest and awards XP exactly once
+ *
+ * Already-completed quests short-circuit (one-time): unfollow after claim
+ * does not revoke completion or allow duplicate XP.
  */
 export async function POST(request: Request) {
   try {
@@ -48,14 +63,50 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const session = await readXSessionCookie();
 
+    let user;
+    try {
+      user = await fetchOrCreateUser(walletAddress);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to load user progress",
+        },
+        { status: 500 },
+      );
+    }
+
+    let progress: QuestProgress = user
+      ? userRowToProgress(user)
+      : {
+          totalXp: 0,
+          streak: 0,
+          lastCheckInDate: null,
+          completedQuestIds: [],
+        };
+
+    // One-time quest: keep completed even if user later unfollows.
+    if (progress.completedQuestIds.includes("follow-x")) {
+      return NextResponse.json({
+        status: "completed",
+        alreadyCompleted: true,
+        twitterUserId: user?.twitter_user_id ?? user?.x_user_id ?? null,
+        verifiedAt: user?.x_follow_verified_at ?? null,
+        progress: progressPayload(progress),
+        xUsername: user?.x_username ?? null,
+      });
+    }
+
+    const session = await readXSessionCookie();
     if (
       !session ||
       normalizeWalletAddress(session.walletAddress) !== walletAddress
     ) {
       return NextResponse.json(
-        { status: "not_authenticated" },
+        { error: "not_authenticated", status: "not_authenticated" },
         { status: 401 },
       );
     }
@@ -68,53 +119,61 @@ export async function POST(request: Request) {
     });
 
     if (!following) {
-      return NextResponse.json({ status: "not_following" });
+      return NextResponse.json({
+        error: "not_following",
+        status: "not_following",
+      });
     }
 
-    const user = await fetchOrCreateUser(walletAddress);
-    let progress: QuestProgress = user
-      ? userRowToProgress(user)
-      : {
-          totalXp: 0,
-          streak: 0,
-          lastCheckInDate: null,
-          completedQuestIds: [],
-        };
+    const verifiedAt = new Date().toISOString();
 
-    const alreadyCompleted = progress.completedQuestIds.includes("follow-x");
-    if (!alreadyCompleted) {
-      progress = completeOneTimeQuest(
-        progress,
-        "follow-x",
-        QUEST_DEFINITIONS,
+    try {
+      await saveXFollowVerification(walletAddress, {
+        twitterUserId: session.xUserId,
+        xUsername: session.xUsername,
+        verifiedAt,
+      });
+    } catch (verifySaveError) {
+      return NextResponse.json(
+        {
+          error:
+            verifySaveError instanceof Error
+              ? verifySaveError.message
+              : "Failed to store X follow verification",
+        },
+        { status: 500 },
       );
+    }
 
-      try {
-        await saveUserProgress(walletAddress, progress);
-      } catch (saveError) {
-        console.error("[x/verify-follow] saveUserProgress", saveError);
-        // Still return completed so client can apply local progress.
-      }
+    progress = completeOneTimeQuest(
+      progress,
+      "follow-x",
+      QUEST_DEFINITIONS,
+    );
+
+    try {
+      await saveUserProgress(walletAddress, progress);
+    } catch (saveError) {
+      return NextResponse.json(
+        {
+          error:
+            saveError instanceof Error
+              ? saveError.message
+              : "Failed to save quest progress",
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       status: "completed",
-      alreadyCompleted,
-      progress: {
-        totalXp: progress.totalXp,
-        streak: progress.streak,
-        lastCheckInDate: progress.lastCheckInDate,
-        completedQuestIds: progress.completedQuestIds,
-      },
+      alreadyCompleted: false,
+      twitterUserId: session.xUserId,
+      verifiedAt,
+      progress: progressPayload(progress),
       xUsername: session.xUsername,
     });
   } catch (error) {
-    console.error("[x/verify-follow] exact exception:", error);
-    if (error instanceof Error) {
-      console.error("[x/verify-follow] message:", error.message);
-      console.error("[x/verify-follow] stack:", error.stack);
-    }
-
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : String(error),
