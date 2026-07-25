@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         status: "completed",
         alreadyCompleted: true,
-        twitterUserId: user?.twitter_user_id ?? user?.x_user_id ?? null,
+        twitterUserId: user?.twitter_user_id ?? null,
         verifiedAt: user?.x_follow_verified_at ?? null,
         progress: progressPayload(progress),
         xUsername: user?.x_username ?? null,

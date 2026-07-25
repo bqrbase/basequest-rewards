@@ -19,17 +19,15 @@ import { logSupabaseError } from "@/lib/supabase/errors";
  *   streak integer not null default 0,
  *   last_checkin date,
  *   completed_quests jsonb not null default '[]'::jsonb,
- *   x_user_id text,
- *   x_username text,
  *   twitter_user_id text,
+ *   x_username text,
  *   x_follow_verified_at timestamptz,
  *   created_at timestamptz not null default now(),
  *   updated_at timestamptz not null default now()
  * );
  *
- * alter table users add column if not exists x_user_id text;
- * alter table users add column if not exists x_username text;
  * alter table users add column if not exists twitter_user_id text;
+ * alter table users add column if not exists x_username text;
  * alter table users add column if not exists x_follow_verified_at timestamptz;
  */
 export type UserRow = {
@@ -39,9 +37,8 @@ export type UserRow = {
   streak: number;
   last_checkin: string | null;
   completed_quests: QuestId[] | string[] | null;
-  x_user_id?: string | null;
-  x_username?: string | null;
   twitter_user_id?: string | null;
+  x_username?: string | null;
   x_follow_verified_at?: string | null;
 };
 
@@ -173,9 +170,8 @@ export async function linkXAccountToWallet(
   const { error } = await supabase
     .from("users")
     .update({
-      x_user_id: account.xUserId,
-      x_username: account.xUsername,
       twitter_user_id: account.xUserId,
+      x_username: account.xUsername,
       updated_at: new Date().toISOString(),
     })
     .eq("wallet_address", normalizedAddress);
@@ -183,7 +179,7 @@ export async function linkXAccountToWallet(
   if (error) {
     logSupabaseError("linkXAccountToWallet", "update", error, {
       walletAddress: normalizedAddress,
-      xUserId: account.xUserId,
+      twitterUserId: account.xUserId,
     });
     throw error;
   }
@@ -220,7 +216,6 @@ export async function saveXFollowVerification(
   const verifiedAt = account.verifiedAt ?? new Date().toISOString();
   const updatePayload = {
     twitter_user_id: account.twitterUserId,
-    x_user_id: account.twitterUserId,
     x_username: account.xUsername,
     x_follow_verified_at: verifiedAt,
     updated_at: verifiedAt,
