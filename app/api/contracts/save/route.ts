@@ -24,10 +24,13 @@ function isTxHash(value: string): boolean {
   return /^0x[a-fA-F0-9]{64}$/.test(value);
 }
 
+const BASE_MAINNET_CHAIN_ID = 8453;
+
 /**
  * POST /api/contracts/save
  * Persists a deployed contract address using the service-role admin client.
  * Bypasses RLS — never uses the browser anon client.
+ * Base Mainnet (8453) only.
  */
 export async function POST(request: Request) {
   try {
@@ -71,6 +74,18 @@ export async function POST(request: Request) {
     if (typeof chainId !== "number" || !Number.isFinite(chainId)) {
       return NextResponse.json(
         { success: false, error: "valid_chain_id_required" },
+        { status: 400 },
+      );
+    }
+
+    if (chainId !== BASE_MAINNET_CHAIN_ID) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "base_mainnet_required",
+          message: "Only Base Mainnet (chainId 8453) is supported.",
+          chainId,
+        },
         { status: 400 },
       );
     }

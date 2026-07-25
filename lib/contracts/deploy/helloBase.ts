@@ -2,7 +2,7 @@ import {
   HELLO_BASE_ABI,
   HELLO_BASE_BYTECODE,
 } from "@/lib/contracts/abi/HelloBase";
-import { base, baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 import type { Config } from "wagmi";
 import { deployContract, waitForTransactionReceipt } from "wagmi/actions";
 import type { Address, Hash, Hex } from "viem";
@@ -32,21 +32,16 @@ export type HelloBaseDeployResult =
   | HelloBaseDeploySuccess
   | HelloBaseDeployFailure;
 
-const SUPPORTED_CHAIN_IDS = [base.id, baseSepolia.id] as const;
-type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number];
+const BASE_MAINNET_CHAIN_ID = base.id;
 
-function isSupportedChainId(chainId: number): chainId is SupportedChainId {
-  return (SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
+function isBaseMainnet(chainId: number): boolean {
+  return chainId === BASE_MAINNET_CHAIN_ID;
 }
 
 export function getBaseScanAddressUrl(
   contractAddress: string,
-  chainId: number,
+  _chainId?: number,
 ): string {
-  if (chainId === baseSepolia.id) {
-    return `https://sepolia.basescan.org/address/${contractAddress}`;
-  }
-
   return `https://basescan.org/address/${contractAddress}`;
 }
 
@@ -62,17 +57,18 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Deploy HelloBase with the connected wallet and wait for confirmation.
+ * Base Mainnet (8453) only.
  */
 export async function deployHelloBase(
   params: HelloBaseDeployParams,
 ): Promise<HelloBaseDeployResult> {
   const chainId = params.chainId ?? base.id;
 
-  if (!isSupportedChainId(chainId)) {
+  if (!isBaseMainnet(chainId)) {
     return {
       ok: false,
       status: "error",
-      message: "Switch to Base or Base Sepolia to deploy HelloBase.",
+      message: "Switch to Base Mainnet to deploy HelloBase.",
     };
   }
 

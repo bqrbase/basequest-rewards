@@ -1,27 +1,26 @@
 /**
- * Deploy HelloBase to Base Sepolia.
+ * Deploy HelloBase to Base Mainnet.
  *
- * Prerequisites (in .env):
- *   BASE_SEPOLIA_RPC_URL=...
+ * Prerequisites (in hardhat/.env):
+ *   BASE_RPC_URL=https://mainnet.base.org
  *   DEPLOYER_PRIVATE_KEY=...
  *
- * Run manually when ready (does not run automatically):
- *   npx hardhat run scripts/deployHelloBase.ts --network baseSepolia
- *
- * This script does not connect an app wallet — it uses the deployer key
- * from Hardhat network config only.
+ * Run:
+ *   npx hardhat run scripts/deployHelloBase.ts --network base
  */
 import { network } from "hardhat";
 
 const connection = await network.create({
-  network: "baseSepolia",
+  network: "base",
   chainType: "op",
 });
 
 const { viem } = connection;
+const publicClient = await viem.getPublicClient();
 const [deployer] = await viem.getWalletClients();
 
-console.log("Network: baseSepolia");
+console.log("Network: base (mainnet)");
+console.log("Chain ID:", await publicClient.getChainId());
 console.log("Deployer:", deployer.account.address);
 
 const helloBase = await viem.deployContract("HelloBase");

@@ -29,6 +29,7 @@ function isTxHash(value: string): boolean {
 /**
  * POST /api/nfts/claim/save
  * Persists a claimed NFT using the service-role admin client.
+ * Base Mainnet (8453) only.
  */
 export async function POST(request: Request) {
   try {
@@ -75,6 +76,18 @@ export async function POST(request: Request) {
     if (!txHash || !isTxHash(txHash)) {
       return NextResponse.json(
         { success: false, error: "valid_tx_hash_required" },
+        { status: 400 },
+      );
+    }
+
+    if (chainId !== BASE_MAINNET_CHAIN_ID) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "base_mainnet_required",
+          message: "Only Base Mainnet (chainId 8453) is supported.",
+          chainId,
+        },
         { status: 400 },
       );
     }

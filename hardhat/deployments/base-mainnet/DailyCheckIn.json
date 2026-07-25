@@ -1,0 +1,9 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "contract": "DailyCheckIn",
+  "address": "0x483d79263e566f6ad4a8884f96889870124d64cf",
+  "transactionHash": "0xb39d100694510d062b59d28858a65f3e06ace76cc4ce40c2d6467b987d634f84",
+  "deployer": "0x1819171c76d4b993ae6f14f43381b1dfcd2aa09f",
+  "status": "success"
+}

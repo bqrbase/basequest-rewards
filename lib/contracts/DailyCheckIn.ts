@@ -1,5 +1,6 @@
+/** Base Mainnet (8453) DailyCheckIn — deployed via hardhat/scripts/deployDailyCheckIn.ts */
 export const DAILY_CHECK_IN_ADDRESS =
-  "0x4A2d89C4B9520C63827f5De43a24b22862Cb82f4" as const;
+  "0x483d79263e566f6ad4a8884f96889870124d64cf" as const;
 
 export const DAILY_CHECK_IN_ABI = [
   {

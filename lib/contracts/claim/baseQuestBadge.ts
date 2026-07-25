@@ -10,7 +10,7 @@ import {
   type Hex,
   type Log,
 } from "viem";
-import { base, baseSepolia } from "viem/chains";
+import { base } from "viem/chains";
 import type { Config } from "wagmi";
 import {
   readContract,
@@ -43,11 +43,10 @@ export type ClaimBadgeFailure = {
 
 export type ClaimBadgeResult = ClaimBadgeSuccess | ClaimBadgeFailure;
 
-const SUPPORTED_CHAIN_IDS = [base.id, baseSepolia.id] as const;
-type SupportedChainId = (typeof SUPPORTED_CHAIN_IDS)[number];
+const BASE_MAINNET_CHAIN_ID = base.id;
 
-function isSupportedChainId(chainId: number): chainId is SupportedChainId {
-  return (SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
+function isBaseMainnet(chainId: number): boolean {
+  return chainId === BASE_MAINNET_CHAIN_ID;
 }
 
 export function getBaseQuestBadgeAddress(): Address | null {
@@ -60,22 +59,16 @@ export function getBaseQuestBadgeAddress(): Address | null {
 
 export function getBaseScanAddressUrl(
   contractAddress: string,
-  chainId: number,
+  _chainId?: number,
 ): string {
-  if (chainId === baseSepolia.id) {
-    return `https://sepolia.basescan.org/address/${contractAddress}`;
-  }
   return `https://basescan.org/address/${contractAddress}`;
 }
 
 export function getBaseScanNftUrl(
   contractAddress: string,
   tokenId: string,
-  chainId: number,
+  _chainId?: number,
 ): string {
-  if (chainId === baseSepolia.id) {
-    return `https://sepolia.basescan.org/nft/${contractAddress}/${tokenId}`;
-  }
   return `https://basescan.org/nft/${contractAddress}/${tokenId}`;
 }
 
@@ -163,11 +156,11 @@ export async function claimBaseQuestBadge(
     };
   }
 
-  if (!isSupportedChainId(chainId)) {
+  if (!isBaseMainnet(chainId)) {
     return {
       ok: false,
       status: "error",
-      message: "Switch to Base or Base Sepolia to claim the NFT.",
+      message: "Switch to Base Mainnet to claim the NFT.",
     };
   }
 
