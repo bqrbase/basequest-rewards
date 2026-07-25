@@ -1452,70 +1452,8 @@ export default function WalletScoreDashboard() {
       </section>
       </Reveal>
 
-      {/* 6. NFTs */}
+      {/* 6. Recent Activity */}
       <Reveal delayMs={240}>
-      <section>
-        <SectionHeading
-          eyebrow="Collectibles"
-          title="NFTs"
-          badge={sourceBadge(sectionSource)}
-        />
-        {(() => {
-          const kind = resolveSectionKind({
-            isConnected: live.isConnected,
-            isLoading: live.isLoading,
-            hasData: analytics.nftItems.length > 0,
-            health: analytics.health,
-            sectionError: analytics.sectionErrors.nfts,
-          });
-          if (kind === "loading") {
-            return <SectionSkeleton rows={2} />;
-          }
-          if (kind !== "data") {
-            return (
-              <FallbackCard
-                title="Collectibles"
-                message={sectionFallbackMessage(
-                  kind,
-                  "No NFTs found on Base for this wallet.",
-                  analytics.sectionErrors.nfts || analytics.statusMessage,
-                )}
-              />
-            );
-          }
-          return (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-              {analytics.nftItems.map((nft) => (
-                <article
-                  key={nft.id}
-                  className={`${panelClassName("secondary")} group transition-transform duration-300 hover:-translate-y-0.5`}
-                >
-                  <PanelGlow />
-                  <div
-                    className={`relative z-10 aspect-square bg-gradient-to-br ${nft.accent}`}
-                    aria-hidden
-                  />
-                  <div className="relative z-10 p-3 sm:p-4">
-                    <p className="truncate text-sm font-semibold text-white">
-                      {nft.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-white/45">
-                      {nft.collection}
-                    </p>
-                    <p className="mt-2 text-xs font-semibold tabular-nums text-white/70">
-                      Floor {nft.floor}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          );
-        })()}
-      </section>
-      </Reveal>
-
-      {/* 7. Recent Activity */}
-      <Reveal delayMs={280}>
       <section>
         <SectionHeading
           eyebrow="Timeline"
