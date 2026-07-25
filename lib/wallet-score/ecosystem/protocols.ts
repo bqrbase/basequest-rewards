@@ -1,6 +1,9 @@
 /**
  * Curated Base mainnet contracts mapped to ecosystem protocols.
  * Addresses are stored lowercase for O(1) lookup.
+ *
+ * Primary detection: exact address (and proxy implementation addresses).
+ * Fallback only: Blockscout labels / protocol tags when the address is unknown.
  */
 export type BaseProtocolDefinition = {
   id: string;
@@ -21,6 +24,16 @@ export const BASE_PROTOCOL_BY_ADDRESS: Record<string, BaseProtocolDefinition> = 
     id: "aerodrome",
     name: "Aerodrome",
   },
+  // Aerodrome Slipstream CLPool implementation (eip1167 proxies point here)
+  "0xec8e5342b19977b4ef8892e02d8daecfa1315831": {
+    id: "aerodrome",
+    name: "Aerodrome",
+  },
+  // Aerodrome basic/stable Pool implementation
+  "0xa4e46b4f701c62e14df11b48dce76a7d793cd6d7": {
+    id: "aerodrome",
+    name: "Aerodrome",
+  },
 
   // Uniswap
   "0x2626664c2603336e57b271c5c0b26f421741e481": {
@@ -36,6 +49,11 @@ export const BASE_PROTOCOL_BY_ADDRESS: Record<string, BaseProtocolDefinition> = 
     name: "Uniswap",
   },
   "0x33128a8fc17869897dce68ed026d694621f6fdfd": {
+    id: "uniswap",
+    name: "Uniswap",
+  },
+  // Uniswap v4 Universal Router on Base (common swap entrypoint)
+  "0xfdf682f51fe81aa4898f0ae2163d8a55c127fbc7": {
     id: "uniswap",
     name: "Uniswap",
   },
@@ -91,6 +109,38 @@ export const BASE_PROTOCOL_BY_ADDRESS: Record<string, BaseProtocolDefinition> = 
     id: "compound",
     name: "Compound",
   },
+
+  // Zora
+  "0x04e2516a2c207e84a1839755675dfd8ef6302f0a": {
+    id: "zora",
+    name: "Zora",
+  },
+  "0x7777777f279eba3d3ad8f4e708545291a6fdba8b": {
+    id: "zora",
+    name: "Zora",
+  },
+  "0x777777c338d93e2c7adf08d102ce628e594bf203": {
+    id: "zora",
+    name: "Zora",
+  },
+  "0x777777751622c0d2457ca91ead7bc2cc7d3ec6c9": {
+    id: "zora",
+    name: "Zora",
+  },
+  // Detected Zora Coin (DropERC20) interactions on Base
+  "0xc6b4444073f4ee01f707253e6d915b3ff337711b": {
+    id: "zora",
+    name: "Zora",
+  },
+  "0xd9e1488c50b94bb4f7fbe5afc639c3603a615a54": {
+    id: "zora",
+    name: "Zora",
+  },
+  // DropERC20 implementation used by Zora Coin proxies
+  "0x3de12ec4085edb23c512f28409ff5ef7c9dd15c5": {
+    id: "zora",
+    name: "Zora",
+  },
 };
 
 /** Normalize an address for registry lookup. */
@@ -102,4 +152,82 @@ export function resolveBaseProtocol(
   address: string,
 ): BaseProtocolDefinition | null {
   return BASE_PROTOCOL_BY_ADDRESS[normalizeContractAddress(address)] ?? null;
+}
+
+/**
+ * Label → protocol map for Blockscout contract names / OLI protocol tags.
+ * Order matters: first match wins.
+ */
+const PROTOCOL_LABEL_MATCHERS: Array<{
+  id: string;
+  name: string;
+  pattern: RegExp;
+}> = [
+  { id: "uniswap", name: "Uniswap", pattern: /uniswap/i },
+  { id: "aerodrome", name: "Aerodrome", pattern: /aerodrome|clpool/i },
+  { id: "zora", name: "Zora", pattern: /\bzora\b/i },
+  { id: "aave", name: "Aave", pattern: /\baave\b/i },
+  { id: "opensea", name: "OpenSea", pattern: /opensea|seaport/i },
+  { id: "1inch", name: "1inch", pattern: /1inch/i },
+  { id: "moonwell", name: "Moonwell", pattern: /moonwell/i },
+  { id: "compound", name: "Compound", pattern: /\bcompound\b/i },
+  { id: "base-bridge", name: "Base Bridge", pattern: /base\s*bridge|l1standardbridge|l2standardbridge/i },
+];
+
+function resolveBaseProtocolFromLabel(
+  label: string,
+): BaseProtocolDefinition | null {
+  const trimmed = label.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  for (const matcher of PROTOCOL_LABEL_MATCHERS) {
+    if (matcher.pattern.test(trimmed)) {
+      return { id: matcher.id, name: matcher.name };
+    }
+  }
+
+  return null;
+}
+
+export type BaseProtocolResolveHints = {
+  /** Primary `tx.to` contract address. */
+  address: string;
+  /** Contract name, protocol tags, implementation names, etc. */
+  labels?: readonly string[];
+  /** Proxy implementation addresses from Blockscout. */
+  relatedAddresses?: readonly string[];
+};
+
+/**
+ * Resolve a protocol with address matching as the primary method:
+ * 1) `tx.to` address in registry
+ * 2) proxy implementation addresses in registry
+ * 3) Blockscout labels / protocol tags (fallback only)
+ */
+export function resolveBaseProtocolFromHints(
+  hints: BaseProtocolResolveHints,
+): BaseProtocolDefinition | null {
+  const direct = resolveBaseProtocol(hints.address);
+  if (direct) {
+    return direct;
+  }
+
+  for (const related of hints.relatedAddresses ?? []) {
+    const hit = resolveBaseProtocol(related);
+    if (hit) {
+      return hit;
+    }
+  }
+
+  // Fallback: labels only when address (and impl addresses) are unknown.
+  for (const label of hints.labels ?? []) {
+    const hit = resolveBaseProtocolFromLabel(label);
+    if (hit) {
+      return hit;
+    }
+  }
+
+  return null;
 }

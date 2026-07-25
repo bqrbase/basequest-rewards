@@ -1,8 +1,8 @@
 import { cachedJsonGet } from "@/lib/wallet-score/cache";
 import { BLOCKSCOUT_BASE_API_V2 } from "@/lib/wallet-score/constants";
 import {
-  resolveBaseProtocol,
   normalizeContractAddress,
+  resolveBaseProtocolFromHints,
 } from "@/lib/wallet-score/ecosystem/protocols";
 import type {
   BaseEcosystemAnalysis,
@@ -16,14 +16,31 @@ import {
 } from "@/lib/wallet-score/scoring/normalize";
 import type { Address } from "viem";
 
+type BlockscoutTag = {
+  tagType?: string;
+  name?: string;
+  meta?: {
+    main_entity?: string;
+    projectName?: string;
+  };
+};
+
+type BlockscoutImplementation = {
+  address_hash?: string;
+  name?: string | null;
+};
+
 type BlockscoutAddressRef = {
   hash?: string;
   is_contract?: boolean;
   name?: string | null;
+  implementations?: BlockscoutImplementation[] | null;
+  metadata?: {
+    tags?: BlockscoutTag[] | null;
+  } | null;
 };
 
 type BlockscoutTx = {
-  hash?: string;
   to?: BlockscoutAddressRef | null;
   created_contract?: BlockscoutAddressRef | null;
 };
@@ -33,7 +50,8 @@ type BlockscoutTxPage = {
   next_page_params?: Record<string, string | number> | null;
 };
 
-const DEFAULT_MAX_PAGES = 8;
+/** Keep close to activity scanning so older protocol hits (e.g. Zora) are not dropped. */
+const DEFAULT_MAX_PAGES = 20;
 
 /**
  * Mirrors the Base Ecosystem Usage curve in the scoring engine.
@@ -82,18 +100,69 @@ async function fetchAddressTransactions(
   });
 }
 
-function targetContractAddress(tx: BlockscoutTx): string | null {
-  const toHash = tx.to?.hash;
-  if (toHash && tx.to?.is_contract) {
-    return normalizeContractAddress(toHash);
+function collectLabels(ref: BlockscoutAddressRef): string[] {
+  const labels: string[] = [];
+
+  if (ref.name) {
+    labels.push(ref.name);
   }
 
-  const created = tx.created_contract?.hash;
-  if (created) {
-    return normalizeContractAddress(created);
+  for (const tag of ref.metadata?.tags ?? []) {
+    if (tag.tagType === "protocol" && tag.name) {
+      labels.push(tag.name);
+    }
+    if (tag.meta?.main_entity) {
+      labels.push(tag.meta.main_entity);
+    }
+    if (tag.meta?.projectName) {
+      labels.push(tag.meta.projectName);
+    }
   }
 
-  return null;
+  for (const impl of ref.implementations ?? []) {
+    if (impl.name) {
+      labels.push(impl.name);
+    }
+  }
+
+  return labels;
+}
+
+function collectRelatedAddresses(ref: BlockscoutAddressRef): string[] {
+  const related: string[] = [];
+  for (const impl of ref.implementations ?? []) {
+    if (impl.address_hash) {
+      related.push(normalizeContractAddress(impl.address_hash));
+    }
+  }
+  return related;
+}
+
+/**
+ * Extract the interacted contract + Blockscout hints used for protocol matching.
+ * Primary target is still `to` when `is_contract`, else created contracts.
+ */
+function targetContract(tx: BlockscoutTx): {
+  address: string;
+  labels: string[];
+  relatedAddresses: string[];
+} | null {
+  const ref =
+    tx.to?.hash && tx.to.is_contract
+      ? tx.to
+      : tx.created_contract?.hash
+        ? tx.created_contract
+        : null;
+
+  if (!ref?.hash) {
+    return null;
+  }
+
+  return {
+    address: normalizeContractAddress(ref.hash),
+    labels: collectLabels(ref),
+    relatedAddresses: collectRelatedAddresses(ref),
+  };
 }
 
 /**
@@ -127,28 +196,28 @@ export async function analyzeBaseEcosystem(
 
       for (const tx of items) {
         transactionsScanned += 1;
-        const contract = targetContractAddress(tx);
-        if (!contract) {
+        const target = targetContract(tx);
+        if (!target) {
           continue;
         }
 
-        const protocol = resolveBaseProtocol(contract);
+        const protocol = resolveBaseProtocolFromHints(target);
         if (!protocol) {
           continue;
         }
 
         contractInteractions += 1;
-        uniqueContracts.add(contract);
+        uniqueContracts.add(target.address);
 
         const existing = protocolInteractions.get(protocol.id);
         if (existing) {
           existing.interactions += 1;
-          existing.contracts.add(contract);
+          existing.contracts.add(target.address);
         } else {
           protocolInteractions.set(protocol.id, {
             name: protocol.name,
             interactions: 1,
-            contracts: new Set([contract]),
+            contracts: new Set([target.address]),
           });
         }
       }

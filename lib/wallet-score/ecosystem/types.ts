@@ -23,7 +23,7 @@ export type BaseEcosystemAnalysis = {
    * as the Base Ecosystem Usage weight in the scoring engine.
    */
   ecosystemScore: number;
-  /** Per-protocol breakdown (known registry matches only). */
+  /** Per-protocol breakdown (address registry + Blockscout labels). */
   protocols: EcosystemProtocolHit[];
   /** How many recent txs were scanned for this signal. */
   transactionsScanned: number;
