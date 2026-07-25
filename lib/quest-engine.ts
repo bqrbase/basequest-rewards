@@ -6,7 +6,8 @@ export type QuestId =
   | "follow-x"
   | "follow-farcaster"
   | "deploy-contract"
-  | "claim-nft";
+  | "claim-nft"
+  | "x402-payment";
 
 const QUEST_IDS: QuestId[] = [
   "daily-check-in",
@@ -17,6 +18,7 @@ const QUEST_IDS: QuestId[] = [
   "follow-farcaster",
   "deploy-contract",
   "claim-nft",
+  "x402-payment",
 ];
 
 /** Quests shown in Community section (excluded from Builder lists). */
@@ -29,6 +31,7 @@ export const COMMUNITY_ENGINE_QUEST_IDS: QuestId[] = [
 export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = [
   "deploy-contract",
   "claim-nft",
+  "x402-payment",
 ];
 
 export function isCommunityEngineQuest(questId: QuestId): boolean {
@@ -113,6 +116,10 @@ const QUEST_ENGINE_METADATA: Record<
     prerequisites: ["deploy-contract"],
     ctaAvailable: "Claim NFT",
   },
+  "x402-payment": {
+    prerequisites: [],
+    ctaAvailable: "Start",
+  },
 };
 
 export const QUEST_DEFINITIONS: QuestDefinition[] = [
@@ -178,6 +185,14 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
       "Mint your BaseQuest Builder Badge NFT after deploying your first contract.",
     rewardXp: 50,
     ...QUEST_ENGINE_METADATA["claim-nft"],
+  },
+  {
+    id: "x402-payment",
+    title: "Make an x402 Payment",
+    description:
+      "Call the premium x402 endpoint and complete one successful payment on Base Mainnet.",
+    rewardXp: 100,
+    ...QUEST_ENGINE_METADATA["x402-payment"],
   },
 ];
 

@@ -6,6 +6,7 @@ import CommunityQuestCards, {
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import PageShell from "@/components/PageShell";
+import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import QuestCard from "@/components/QuestCard";
 import { useQuestEngine } from "@/hooks/useQuestEngine";
 import type { QuestId } from "@/lib/quest-engine";
@@ -83,6 +84,10 @@ export default function QuestsPage() {
               />
               <ClaimNftQuestCard
                 quest={quests.find((quest) => quest.id === "claim-nft")}
+                onCompleted={applyServerProgress}
+              />
+              <X402PaymentQuestCard
+                quest={quests.find((quest) => quest.id === "x402-payment")}
                 onCompleted={applyServerProgress}
               />
               {filterBuilderQuests(quests).map((quest) => (

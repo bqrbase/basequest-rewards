@@ -7,6 +7,7 @@ import ConnectWithBuilder from "@/components/ConnectWithBuilder";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import GlassPanel from "@/components/GlassPanel";
+import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import LevelProgressBar from "@/components/LevelProgressBar";
 import LevelUpCelebration from "@/components/LevelUpCelebration";
 import PageShell from "@/components/PageShell";
@@ -194,6 +195,10 @@ export default function Dashboard() {
               />
               <ClaimNftQuestCard
                 quest={quests.find((quest) => quest.id === "claim-nft")}
+                onCompleted={applyServerProgress}
+              />
+              <X402PaymentQuestCard
+                quest={quests.find((quest) => quest.id === "x402-payment")}
                 onCompleted={applyServerProgress}
               />
               {filterBuilderQuests(quests).map((quest) => (
