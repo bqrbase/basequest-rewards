@@ -121,27 +121,53 @@ export async function fetchTargetXUserId(): Promise<string> {
     return cachedTargetUserId;
   }
 
+  const bearerEnvPresent = Boolean(process.env.X_BEARER_TOKEN?.trim());
   const bearer = getXBearerToken();
-  const response = await fetch(
-    `${X_API}/2/users/by/username/${X_TARGET_USERNAME}?user.fields=username`,
-    {
-      headers: {
-        Authorization: `Bearer ${bearer}`,
-      },
-      cache: "no-store",
-    },
-  );
+  const requestUrl = `${X_API}/2/users/by/username/${X_TARGET_USERNAME}?user.fields=username`;
+  const authorizationHeader = `Bearer ${bearer}`;
+  const authorizationType = authorizationHeader.startsWith("Bearer ")
+    ? "Bearer"
+    : authorizationHeader.startsWith("OAuth ")
+      ? "OAuth1"
+      : "unknown";
 
-  const json = (await response.json()) as {
+  console.log("[x/api] fetchTargetXUserId debug", {
+    requestUrl,
+    authorizationHeaderType: authorizationType,
+    authorizationSendsBearerPrefix: authorizationHeader.startsWith("Bearer "),
+    xBearerTokenLoaded: bearerEnvPresent,
+    xBearerTokenLength: bearer.length,
+    xBearerTokenLooksUrlEncoded:
+      Boolean(process.env.X_BEARER_TOKEN?.includes("%")) &&
+      process.env.X_BEARER_TOKEN !== bearer,
+  });
+
+  const response = await fetch(requestUrl, {
+    headers: {
+      Authorization: authorizationHeader,
+    },
+    cache: "no-store",
+  });
+
+  const responseText = await response.text();
+  let json: {
     data?: { id: string; username: string };
     errors?: Array<{ detail?: string; title?: string }>;
-  };
+  } = {};
+  try {
+    json = responseText ? (JSON.parse(responseText) as typeof json) : {};
+  } catch {
+    json = {};
+  }
+
+  console.log("[x/api] fetchTargetXUserId response", {
+    status: response.status,
+    body: responseText,
+  });
 
   if (!response.ok || !json.data?.id) {
     throw new Error(
-      json.errors?.[0]?.detail ||
-        json.errors?.[0]?.title ||
-        `Failed to resolve @${X_TARGET_USERNAME} (HTTP ${response.status})`,
+      `Failed to resolve @${X_TARGET_USERNAME} (HTTP ${response.status}): ${responseText || "(empty body)"}`,
     );
   }
 
