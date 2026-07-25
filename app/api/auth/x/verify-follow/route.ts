@@ -134,12 +134,41 @@ export async function POST(request: Request) {
         verifiedAt,
       });
     } catch (verifySaveError) {
+      const supabaseError =
+        verifySaveError && typeof verifySaveError === "object"
+          ? (verifySaveError as {
+              code?: string;
+              message?: string;
+              details?: string;
+              hint?: string;
+            })
+          : null;
+
+      const code = supabaseError?.code ?? null;
+      const message =
+        supabaseError?.message ??
+        (verifySaveError instanceof Error
+          ? verifySaveError.message
+          : String(verifySaveError));
+      const details = supabaseError?.details ?? null;
+      const hint = supabaseError?.hint ?? null;
+
+      console.error("[x/verify-follow] saveXFollowVerification", {
+        error: verifySaveError,
+        code,
+        message,
+        details,
+        hint,
+      });
+
       return NextResponse.json(
         {
-          error:
-            verifySaveError instanceof Error
-              ? verifySaveError.message
-              : "Failed to store X follow verification",
+          error: "Failed to store X follow verification",
+          code,
+          message,
+          details,
+          hint,
+          supabase: verifySaveError,
         },
         { status: 500 },
       );
