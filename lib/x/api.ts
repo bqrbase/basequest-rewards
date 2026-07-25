@@ -1,4 +1,5 @@
 import {
+  getXBearerToken,
   getXClientId,
   getXClientSecret,
   X_TARGET_USERNAME,
@@ -86,7 +87,7 @@ export async function exchangeXCodeForToken(params: {
 
 /**
  * GET https://api.x.com/2/users/me
- * Requires the authenticated user's OAuth 2.0 access token.
+ * Requires the authenticated user's OAuth 2.0 access token (user context).
  */
 export async function fetchXAuthenticatedUser(
   accessToken: string,
@@ -115,18 +116,56 @@ export async function fetchXAuthenticatedUser(
 }
 
 /**
- * User-context follow verification for @bqrbase.
- * Uses the authenticated user's OAuth access token only (no app bearer).
+ * Resolve @bqrbase via App Bearer Token only (not OAuth session token).
+ * GET https://api.x.com/2/users/by/username/bqrbase
+ */
+async function fetchTargetUserIdWithAppBearer(): Promise<string> {
+  const bearer = getXBearerToken();
+  const requestUrl = `${X_API}/2/users/by/username/${X_TARGET_USERNAME}`;
+
+  const response = await fetch(requestUrl, {
+    headers: {
+      Authorization: `Bearer ${bearer}`,
+    },
+    cache: "no-store",
+  });
+
+  const responseText = await response.text();
+  let json: {
+    data?: { id: string; username?: string };
+    errors?: Array<{ detail?: string; title?: string }>;
+  } = {};
+  try {
+    json = responseText ? (JSON.parse(responseText) as typeof json) : {};
+  } catch {
+    json = {};
+  }
+
+  if (!response.ok || !json.data?.id) {
+    throw new Error(
+      json.errors?.[0]?.detail ||
+        json.errors?.[0]?.title ||
+        `Failed to resolve @${X_TARGET_USERNAME} (HTTP ${response.status}): ${responseText || "(empty body)"}`,
+    );
+  }
+
+  return json.data.id;
+}
+
+/**
+ * Verify the authenticated OAuth user follows @bqrbase.
  *
- * GET /2/users/by/username/:username?user.fields=connection_status
- * Docs: connection_status includes "following" when the authed user follows them.
+ * - App Bearer Token → resolve @bqrbase id
+ * - User OAuth access token → connection_status (user context)
+ *
+ * Tokens are never mixed on the same request.
  */
 export async function doesAuthenticatedUserFollowTarget(
   accessToken: string,
 ): Promise<boolean> {
-  const url = new URL(
-    `${X_API}/2/users/by/username/${X_TARGET_USERNAME}`,
-  );
+  const targetUserId = await fetchTargetUserIdWithAppBearer();
+
+  const url = new URL(`${X_API}/2/users/${targetUserId}`);
   url.searchParams.set("user.fields", "connection_status,username");
 
   const response = await fetch(url, {
