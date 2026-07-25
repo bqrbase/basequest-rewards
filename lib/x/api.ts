@@ -5,7 +5,7 @@ import {
   X_TARGET_USERNAME,
 } from "@/lib/x/config";
 
-const X_API = "https://api.twitter.com";
+const X_API = "https://api.x.com";
 const X_AUTH = "https://twitter.com";
 
 export type XTokenResponse = {
@@ -121,30 +121,36 @@ export async function fetchTargetXUserId(): Promise<string> {
     return cachedTargetUserId;
   }
 
-  const bearerEnvPresent = Boolean(process.env.X_BEARER_TOKEN?.trim());
+  const rawBearerEnv = process.env.X_BEARER_TOKEN;
+  const tokenFingerprint = {
+    VERCEL_ENV: process.env.VERCEL_ENV ?? null,
+    "X_BEARER_TOKEN.length": rawBearerEnv?.length ?? null,
+    "X_BEARER_TOKEN.slice(0,8)": rawBearerEnv?.slice(0, 8) ?? null,
+    "X_BEARER_TOKEN.slice(-8)": rawBearerEnv?.slice(-8) ?? null,
+    "X_CLIENT_ID.slice(0,8)": process.env.X_CLIENT_ID?.slice(0, 8) ?? null,
+    X_CLIENT_SECRET: process.env.X_CLIENT_SECRET ? "loaded" : "missing",
+  };
+
+  // Fingerprint only — never log the full bearer token.
+  console.log("[x/api] env fingerprint before username lookup", tokenFingerprint);
+
+  if (!rawBearerEnv?.trim()) {
+    throw new Error(
+      JSON.stringify({
+        error: "x_bearer_token_missing",
+        message:
+          "X_BEARER_TOKEN is missing in this environment. Compare Vercel env with local curl.",
+        ...tokenFingerprint,
+      }),
+    );
+  }
+
   const bearer = getXBearerToken();
   const requestUrl = `${X_API}/2/users/by/username/${X_TARGET_USERNAME}?user.fields=username`;
-  const authorizationHeader = `Bearer ${bearer}`;
-  const authorizationType = authorizationHeader.startsWith("Bearer ")
-    ? "Bearer"
-    : authorizationHeader.startsWith("OAuth ")
-      ? "OAuth1"
-      : "unknown";
-
-  console.log("[x/api] fetchTargetXUserId debug", {
-    requestUrl,
-    authorizationHeaderType: authorizationType,
-    authorizationSendsBearerPrefix: authorizationHeader.startsWith("Bearer "),
-    xBearerTokenLoaded: bearerEnvPresent,
-    xBearerTokenLength: bearer.length,
-    xBearerTokenLooksUrlEncoded:
-      Boolean(process.env.X_BEARER_TOKEN?.includes("%")) &&
-      process.env.X_BEARER_TOKEN !== bearer,
-  });
 
   const response = await fetch(requestUrl, {
     headers: {
-      Authorization: authorizationHeader,
+      Authorization: `Bearer ${bearer}`,
     },
     cache: "no-store",
   });
@@ -159,11 +165,6 @@ export async function fetchTargetXUserId(): Promise<string> {
   } catch {
     json = {};
   }
-
-  console.log("[x/api] fetchTargetXUserId response", {
-    status: response.status,
-    body: responseText,
-  });
 
   if (!response.ok || !json.data?.id) {
     throw new Error(
