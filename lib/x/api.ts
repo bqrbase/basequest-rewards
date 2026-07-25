@@ -1,5 +1,4 @@
 import {
-  getXBearerToken,
   getXClientId,
   getXClientSecret,
   X_TARGET_USERNAME,
@@ -115,93 +114,74 @@ export async function fetchXAuthenticatedUser(
   return json.data;
 }
 
-/**
- * Resolve @bqrbase via App Bearer Token only (not OAuth session token).
- * GET https://api.x.com/2/users/by/username/bqrbase
- */
-async function fetchTargetUserIdWithAppBearer(): Promise<string> {
-  const bearer = getXBearerToken();
-  const requestUrl = `${X_API}/2/users/by/username/${X_TARGET_USERNAME}`;
-
-  const response = await fetch(requestUrl, {
-    headers: {
-      Authorization: `Bearer ${bearer}`,
-    },
-    cache: "no-store",
-  });
-
-  const responseText = await response.text();
-  let json: {
-    data?: { id: string; username?: string };
-    errors?: Array<{ detail?: string; title?: string }>;
-  } = {};
-  try {
-    json = responseText ? (JSON.parse(responseText) as typeof json) : {};
-  } catch {
-    json = {};
-  }
-
-  if (!response.ok || !json.data?.id) {
-    throw new Error(
-      json.errors?.[0]?.detail ||
-        json.errors?.[0]?.title ||
-        `Failed to resolve @${X_TARGET_USERNAME} (HTTP ${response.status}): ${responseText || "(empty body)"}`,
-    );
-  }
-
-  return json.data.id;
-}
+type FollowingPage = {
+  data?: Array<{ id: string; username?: string }>;
+  meta?: { next_token?: string; result_count?: number };
+  errors?: Array<{ detail?: string; title?: string }>;
+  title?: string;
+  detail?: string;
+};
 
 /**
- * Verify the authenticated OAuth user follows @bqrbase.
- *
- * - App Bearer Token → resolve @bqrbase id
- * - User OAuth access token → connection_status (user context)
- *
- * Tokens are never mixed on the same request.
+ * Official follow verification (user context):
+ * GET /2/users/{id}/following?max_results=1000&user.fields=username
+ * Succeeds when username "bqrbase" appears in the following list.
+ * Does not use connection_status or App Bearer Token.
  */
 export async function doesAuthenticatedUserFollowTarget(
   accessToken: string,
+  authenticatedUserId: string,
 ): Promise<boolean> {
-  const targetUserId = await fetchTargetUserIdWithAppBearer();
+  const targetUsername = X_TARGET_USERNAME.toLowerCase();
+  let nextToken: string | undefined;
 
-  const url = new URL(`${X_API}/2/users/${targetUserId}`);
-  url.searchParams.set("user.fields", "connection_status,username");
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: "no-store",
-  });
-
-  const responseText = await response.text();
-  let json: {
-    data?: {
-      id: string;
-      username?: string;
-      connection_status?: string[];
-    };
-    errors?: Array<{ detail?: string; title?: string }>;
-    title?: string;
-    detail?: string;
-  } = {};
-
-  try {
-    json = responseText ? (JSON.parse(responseText) as typeof json) : {};
-  } catch {
-    json = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      json.errors?.[0]?.detail ||
-        json.detail ||
-        json.title ||
-        `X API follow check failed (HTTP ${response.status}): ${responseText || "(empty body)"}`,
+  // Paginate following pages so accounts with >1000 follows still verify correctly.
+  for (let page = 0; page < 15; page += 1) {
+    const url = new URL(
+      `${X_API}/2/users/${authenticatedUserId}/following`,
     );
+    url.searchParams.set("max_results", "1000");
+    url.searchParams.set("user.fields", "username");
+    if (nextToken) {
+      url.searchParams.set("pagination_token", nextToken);
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+
+    const responseText = await response.text();
+    let json: FollowingPage = {};
+    try {
+      json = responseText ? (JSON.parse(responseText) as FollowingPage) : {};
+    } catch {
+      json = {};
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        json.errors?.[0]?.detail ||
+          json.detail ||
+          json.title ||
+          `X API following check failed (HTTP ${response.status}): ${responseText || "(empty body)"}`,
+      );
+    }
+
+    const found = (json.data ?? []).some(
+      (user) => user.username?.toLowerCase() === targetUsername,
+    );
+    if (found) {
+      return true;
+    }
+
+    nextToken = json.meta?.next_token;
+    if (!nextToken) {
+      break;
+    }
   }
 
-  const statuses = json.data?.connection_status ?? [];
-  return statuses.includes("following");
+  return false;
 }

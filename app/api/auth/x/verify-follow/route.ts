@@ -111,10 +111,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // User-context only: OAuth access token → /2/users/me → follow check.
+    // Official flow: /2/users/me → /2/users/{id}/following → username "bqrbase".
     const xUser = await fetchXAuthenticatedUser(session.accessToken);
     const following = await doesAuthenticatedUserFollowTarget(
       session.accessToken,
+      xUser.id,
     );
 
     if (!following) {
