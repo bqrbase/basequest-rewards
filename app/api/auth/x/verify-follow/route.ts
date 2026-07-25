@@ -153,8 +153,7 @@ export async function POST(request: Request) {
       const details = supabaseError?.details ?? null;
       const hint = supabaseError?.hint ?? null;
 
-      console.error("[x/verify-follow] saveXFollowVerification", {
-        error: verifySaveError,
+      console.error("[x/verify-follow] saveXFollowVerification failed", {
         code,
         message,
         details,
@@ -168,7 +167,6 @@ export async function POST(request: Request) {
           message,
           details,
           hint,
-          supabase: verifySaveError,
         },
         { status: 500 },
       );

@@ -100,8 +100,6 @@ export async function saveDeployedContract(
     chain_id: input.chainId,
   };
 
-  console.error("[saveDeployedContract] insert payload (admin):", payload);
-
   const { data, error } = await supabase
     .from("deployed_contracts")
     .insert(payload)
@@ -110,14 +108,6 @@ export async function saveDeployedContract(
 
   if (error) {
     const info = extractSupabaseError(error);
-    console.error("[saveDeployedContract] exact Supabase error:", {
-      code: info.code,
-      message: info.message,
-      details: info.details,
-      hint: info.hint,
-      payload,
-      raw: info.raw,
-    });
     logSupabaseError("saveDeployedContract", "insert", error, {
       payload,
       code: info.code,

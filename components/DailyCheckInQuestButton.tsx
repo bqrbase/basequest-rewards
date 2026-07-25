@@ -45,11 +45,9 @@ export default function DailyCheckInQuestButton({
         hash,
       });
 
-      console.log("Transaction:", hash);
-
       onSuccess?.();
     } catch (error) {
-      console.error("Daily Check-in failed:", error);
+      console.error("[DailyCheckInQuestButton] check-in failed:", error);
     } finally {
       setIsSubmitting(false);
     }

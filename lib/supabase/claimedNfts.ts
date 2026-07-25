@@ -72,8 +72,6 @@ export async function saveClaimedNft(
     chain_id: input.chainId,
   };
 
-  console.error("[saveClaimedNft] insert payload (admin):", payload);
-
   const { data, error } = await supabase
     .from("claimed_nfts")
     .insert(payload)
@@ -82,14 +80,6 @@ export async function saveClaimedNft(
 
   if (error) {
     const info = extractSupabaseError(error);
-    console.error("[saveClaimedNft] exact Supabase error:", {
-      code: info.code,
-      message: info.message,
-      details: info.details,
-      hint: info.hint,
-      payload,
-      raw: info.raw,
-    });
     logSupabaseError("saveClaimedNft", "insert", error, {
       payload,
       code: info.code,

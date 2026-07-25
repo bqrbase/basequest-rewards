@@ -47,9 +47,9 @@ export async function lookupFidByWalletAddress(
   };
 
   if (!response.ok) {
-    console.error("[neynar] bulk-by-address full response:", {
+    console.error("[neynar] bulk-by-address failed", {
       status: response.status,
-      body: json,
+      message: json.message,
     });
     throw new Error(json.message || `Neynar address lookup failed (${response.status})`);
   }
@@ -98,9 +98,9 @@ export async function doesFidFollowTarget(params: {
       return usernameJson.user.viewer_context.following;
     }
   } else {
-    console.error("[neynar] by_username full response:", {
+    console.error("[neynar] by_username failed", {
       status: usernameResponse.status,
-      body: usernameJson,
+      message: usernameJson.message,
     });
   }
 
@@ -120,9 +120,9 @@ export async function doesFidFollowTarget(params: {
   };
 
   if (!fidResponse.ok) {
-    console.error("[neynar] user/bulk full response:", {
+    console.error("[neynar] user/bulk failed", {
       status: fidResponse.status,
-      body: fidJson,
+      message: fidJson.message,
     });
     throw new Error(
       fidJson.message ||

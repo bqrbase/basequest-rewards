@@ -14,7 +14,7 @@ import {
   type WalletHost,
 } from "@/lib/wagmi";
 import { useEffect, useState } from "react";
-import { useAccount, useConnect, WagmiProvider, type Config } from "wagmi";
+import { WagmiProvider, type Config } from "wagmi";
 import { base } from "wagmi/chains";
 
 type ProvidersProps = {
@@ -38,40 +38,6 @@ function getInitialHostAndConfig(): WalletSetup {
     host: "browser",
     config: createBrowserWagmiConfig(),
   };
-}
-
-/** TEMP DEBUG — remove after Base App wallet restore investigation */
-function WalletDebugLogger({ host }: { host: WalletHost }) {
-  const account = useAccount();
-  const { connectors } = useConnect();
-
-  useEffect(() => {
-    const connectorList = connectors.map((c) => ({ id: c.id, name: c.name }));
-
-    console.log("[Providers wallet debug]", {
-      host,
-      connectors: connectorList,
-      accountStatus: account.status,
-      accountConnectorId: account.connector?.id,
-      accountConnectorName: account.connector?.name,
-    });
-
-    if (host === "baseApp" || detectBaseAppFromInjectedProvider()) {
-      console.log("[Providers Base App restore]", {
-        restoredConnectorId: account.connector?.id,
-        restoredConnectorName: account.connector?.name,
-        accountStatus: account.status,
-      });
-    }
-  }, [
-    host,
-    connectors,
-    account.status,
-    account.connector?.id,
-    account.connector?.name,
-  ]);
-
-  return null;
 }
 
 export default function Providers({ children }: ProvidersProps) {
@@ -159,7 +125,6 @@ export default function Providers({ children }: ProvidersProps) {
             },
           }}
         >
-          <WalletDebugLogger host={host} />
           {children}
         </OnchainKitProvider>
       </QueryClientProvider>

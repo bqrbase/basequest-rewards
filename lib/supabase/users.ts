@@ -200,7 +200,6 @@ export async function saveXFollowVerification(
   const normalizedAddress = normalizeWalletAddress(walletAddress);
   await fetchOrCreateUser(normalizedAddress);
 
-  const usingAdmin = Boolean(getSupabaseAdminClient());
   const supabase = getSupabaseAdminClient() ?? getSupabaseClient();
   if (!supabase) {
     const configError = new Error("Supabase is not configured");
@@ -214,40 +213,21 @@ export async function saveXFollowVerification(
   }
 
   const verifiedAt = account.verifiedAt ?? new Date().toISOString();
-  const updatePayload = {
-    twitter_user_id: account.twitterUserId,
-    x_username: account.xUsername,
-    x_follow_verified_at: verifiedAt,
-    updated_at: verifiedAt,
-  };
-  const updateFilter = { wallet_address: normalizedAddress };
-  const requestPath = "/rest/v1/users";
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("users")
-    .update(updatePayload)
-    .eq("wallet_address", normalizedAddress)
-    .select();
-
-  console.error("[saveXFollowVerification] supabase update inspect", {
-    supabaseUrl,
-    requestPath,
-    usingAdmin,
-    updateFilter,
-    updatePayloadKeys: Object.keys(updatePayload),
-    responseData: data,
-    responseError: error,
-  });
+    .update({
+      twitter_user_id: account.twitterUserId,
+      x_username: account.xUsername,
+      x_follow_verified_at: verifiedAt,
+      updated_at: verifiedAt,
+    })
+    .eq("wallet_address", normalizedAddress);
 
   if (error) {
     logSupabaseError("saveXFollowVerification", "update", error, {
       walletAddress: normalizedAddress,
       twitterUserId: account.twitterUserId,
-      supabaseUrl,
-      requestPath,
-      updateFilter,
-      responseData: data,
     });
     throw error;
   }

@@ -12,13 +12,11 @@ import type { Address } from "viem";
  * GET /api/premium/test
  *
  * Official x402 v2 protection via @x402/next + Coinbase CDP facilitator.
- * Debug wrapper logs the post-signature path and avoids empty `{}` bodies
- * when a PAYMENT-SIGNATURE is present.
+ * Avoids empty `{}` bodies when a PAYMENT-SIGNATURE is present after settle failure.
  */
 
 const NETWORK = "eip155:8453" as const;
 const PRICE = "$0.01";
-const LOG = "[premium/test]";
 
 const payTo = process.env.X402_PAY_TO?.trim() as Address | undefined;
 const hasPayTo = Boolean(payTo && /^0x[a-fA-F0-9]{40}$/.test(payTo));
@@ -30,10 +28,10 @@ type FacilitatorDebug = {
   settleError?: string;
 };
 
-/** Per-request facilitator debug captured during verify/settle. */
+/** Per-request facilitator results captured during verify/settle (for empty-body recovery). */
 let facilitatorDebug: FacilitatorDebug = {};
 
-function createLoggingFacilitatorClient(): HTTPFacilitatorClient {
+function createFacilitatorClient(): HTTPFacilitatorClient {
   const client = new HTTPFacilitatorClient(
     createFacilitatorConfig(
       process.env.CDP_API_KEY_ID,
@@ -48,12 +46,10 @@ function createLoggingFacilitatorClient(): HTTPFacilitatorClient {
     try {
       const result = await originalVerify(...args);
       facilitatorDebug.verify = result;
-      console.error(`${LOG} facilitator verify response:`, result);
       return result;
     } catch (error) {
       facilitatorDebug.verifyError =
         error instanceof Error ? error.message : String(error);
-      console.error(`${LOG} facilitator verify exception:`, error);
       throw error;
     }
   }) as typeof client.verify;
@@ -62,12 +58,10 @@ function createLoggingFacilitatorClient(): HTTPFacilitatorClient {
     try {
       const result = await originalSettle(...args);
       facilitatorDebug.settle = result;
-      console.error(`${LOG} facilitator settle response:`, result);
       return result;
     } catch (error) {
       facilitatorDebug.settleError =
         error instanceof Error ? error.message : String(error);
-      console.error(`${LOG} facilitator settle exception:`, error);
       throw error;
     }
   }) as typeof client.settle;
@@ -75,7 +69,7 @@ function createLoggingFacilitatorClient(): HTTPFacilitatorClient {
   return client;
 }
 
-const facilitatorClient = createLoggingFacilitatorClient();
+const facilitatorClient = createFacilitatorClient();
 
 const server = new x402ResourceServer(facilitatorClient).register(
   NETWORK,
@@ -102,24 +96,6 @@ const protectedGet = hasPayTo
       server,
     )
   : null;
-
-function headersToObject(headers: Headers): Record<string, string> {
-  const out: Record<string, string> = {};
-  headers.forEach((value, key) => {
-    // Avoid dumping full payment payloads into logs when huge; keep presence + length.
-    if (
-      key.toLowerCase() === "payment-signature" ||
-      key.toLowerCase() === "x-payment" ||
-      key.toLowerCase() === "payment-response" ||
-      key.toLowerCase() === "payment-required"
-    ) {
-      out[key] = `[present length=${value.length}]`;
-      return;
-    }
-    out[key] = value;
-  });
-  return out;
-}
 
 function getPaymentSignature(request: NextRequest): string | null {
   return (
@@ -155,20 +131,10 @@ export async function GET(request: NextRequest) {
   facilitatorDebug = {};
 
   const paymentSignature = getPaymentSignature(request);
-  const requestHeaders = headersToObject(request.headers);
-
-  console.error(`${LOG} incoming request after wallet signature path:`, {
-    method: request.method,
-    url: request.url,
-    paymentSignaturePresent: Boolean(paymentSignature),
-    paymentSignatureLength: paymentSignature?.length ?? 0,
-    requestHeaders,
-  });
 
   try {
     const response = await protectedGet(request);
     const statusCode = response.status;
-    const responseHeaders = headersToObject(response.headers);
     const bodyText = await response.clone().text();
 
     let parsedBody: unknown = null;
@@ -178,20 +144,13 @@ export async function GET(request: NextRequest) {
       parsedBody = bodyText;
     }
 
-    console.error(`${LOG} final response:`, {
-      httpStatusCode: statusCode,
-      paymentSignaturePresent: Boolean(paymentSignature),
-      responseHeaders,
-      facilitatorVerify: facilitatorDebug.verify ?? null,
-      facilitatorVerifyError: facilitatorDebug.verifyError ?? null,
-      facilitatorSettle: facilitatorDebug.settle ?? null,
-      facilitatorSettleError: facilitatorDebug.settleError ?? null,
-      finalResponseBody: parsedBody,
-      finalResponseBodyRaw: bodyText,
-    });
-
     // Unpaid 402 with empty body is normal x402 v2. After signing, never return {}.
     if (paymentSignature && isEmptyJsonObject(bodyText, parsedBody)) {
+      console.error("[premium/test] empty response after PAYMENT-SIGNATURE", {
+        httpStatusCode: statusCode,
+        facilitatorVerifyError: facilitatorDebug.verifyError ?? null,
+        facilitatorSettleError: facilitatorDebug.settleError ?? null,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -211,7 +170,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error(`${LOG} caught exception:`, error);
+    console.error("[premium/test] exception:", error);
     return NextResponse.json(
       {
         success: false,

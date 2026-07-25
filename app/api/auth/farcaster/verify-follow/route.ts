@@ -126,11 +126,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("[farcaster/verify-follow] exact exception:", error);
-    if (error instanceof Error) {
-      console.error("[farcaster/verify-follow] message:", error.message);
-      console.error("[farcaster/verify-follow] stack:", error.stack);
-    }
+    console.error("[farcaster/verify-follow] failed", error);
 
     return NextResponse.json(
       {

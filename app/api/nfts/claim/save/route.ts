@@ -80,15 +80,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const payload = {
-      wallet_address: walletAddress,
-      contract_address: contractAddress.toLowerCase(),
-      token_id: tokenId.trim(),
-      tx_hash: txHash,
-      chain_id: chainId,
-    };
-
-    console.error("[api/nfts/claim/save] insert payload:", payload);
 
     const row = await saveClaimedNft({
       walletAddress,

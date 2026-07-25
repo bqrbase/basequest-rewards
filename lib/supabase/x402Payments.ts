@@ -58,8 +58,6 @@ export async function saveX402Payment(
     network: input.network,
   };
 
-  console.error("[saveX402Payment] insert payload (admin):", payload);
-
   const { data, error } = await supabase
     .from("x402_payments")
     .insert(payload)
@@ -68,14 +66,6 @@ export async function saveX402Payment(
 
   if (error) {
     const info = extractSupabaseError(error);
-    console.error("[saveX402Payment] exact Supabase error:", {
-      code: info.code,
-      message: info.message,
-      details: info.details,
-      hint: info.hint,
-      payload,
-      raw: info.raw,
-    });
     logSupabaseError("saveX402Payment", "insert", error, {
       payload,
       code: info.code,

@@ -76,15 +76,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const payload = {
-      wallet_address: walletAddress,
-      template_id: templateId,
-      contract_address: contractAddress.toLowerCase(),
-      tx_hash: txHash ?? null,
-      chain_id: chainId,
-    };
-
-    console.error("[api/contracts/save] insert payload:", payload);
 
     const row = await saveDeployedContract({
       walletAddress,
