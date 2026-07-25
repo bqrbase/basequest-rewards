@@ -8,17 +8,17 @@ import {
   getBaseScanAddressUrl,
   getBaseScanNftUrl,
 } from "@/lib/contracts/claim/baseQuestBadge";
+import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
+import {
+  BASE_MAINNET_REQUIRED_MESSAGE,
+  isBaseMainnetSwitchRejected,
+} from "@/lib/wallet/ensureBaseMainnet";
 import { useEffect, useId, useState } from "react";
 import type { Address, Hash } from "viem";
 import { base } from "viem/chains";
-import {
-  useAccount,
-  useChainId,
-  useConfig,
-  useSwitchChain,
-} from "wagmi";
+import { useAccount, useChainId, useConfig } from "wagmi";
 
 type ClaimNftModalProps = {
   open: boolean;
@@ -49,7 +49,7 @@ export default function ClaimNftModal({
   const config = useConfig();
   const chainId = useChainId();
   const { address, status: walletStatus } = useAccount();
-  const { switchChainAsync } = useSwitchChain();
+  const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
   const badgeAddress = getBaseQuestBadgeAddress();
 
@@ -103,16 +103,7 @@ export default function ClaimNftModal({
     setErrorMessage(null);
 
     try {
-      let claimChainId = chainId;
-      if (claimChainId !== base.id) {
-        try {
-          await switchChainAsync({ chainId: base.id });
-          claimChainId = base.id;
-        } catch {
-          setErrorMessage("Please switch your wallet to Base to claim.");
-          return;
-        }
-      }
+      const claimChainId = await ensureBaseMainnetReady();
 
       const result = await claimBaseQuestBadge({
         config,
@@ -204,10 +195,14 @@ export default function ClaimNftModal({
           "NFT saved, but quest completion failed. Refresh and check progress.",
       );
     } catch (error) {
-      console.error("[ClaimNftModal] claim failed:", error);
-      setErrorMessage(
-        error instanceof Error ? error.message : String(error),
-      );
+      if (isBaseMainnetSwitchRejected(error)) {
+        setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
+      } else {
+        console.error("[ClaimNftModal] claim failed:", error);
+        setErrorMessage(
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     } finally {
       setIsClaiming(false);
     }

@@ -6,17 +6,16 @@ import {
   deployHelloBase,
   getBaseScanAddressUrl,
 } from "@/lib/contracts/deploy/helloBase";
+import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
+import {
+  BASE_MAINNET_REQUIRED_MESSAGE,
+  isBaseMainnetSwitchRejected,
+} from "@/lib/wallet/ensureBaseMainnet";
 import { useEffect, useId, useState } from "react";
 import type { Address, Hash } from "viem";
-import { base } from "viem/chains";
-import {
-  useAccount,
-  useChainId,
-  useConfig,
-  useSwitchChain,
-} from "wagmi";
+import { useAccount, useConfig } from "wagmi";
 
 export type DeployContractTemplateId =
   | "hello-base"
@@ -77,9 +76,8 @@ export default function DeployContractModal({
 }: DeployContractModalProps) {
   const titleId = useId();
   const config = useConfig();
-  const chainId = useChainId();
   const { address, status: walletStatus } = useAccount();
-  const { switchChainAsync } = useSwitchChain();
+  const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
 
   const [step, setStep] = useState<ModalStep>("templates");
@@ -127,16 +125,7 @@ export default function DeployContractModal({
     setErrorMessage(null);
 
     try {
-      let deployChainId = chainId;
-      if (deployChainId !== base.id) {
-        try {
-          await switchChainAsync({ chainId: base.id });
-          deployChainId = base.id;
-        } catch {
-          setErrorMessage("Please switch your wallet to Base to deploy.");
-          return;
-        }
-      }
+      const deployChainId = await ensureBaseMainnetReady();
 
       const result = await deployHelloBase({
         config,
@@ -229,10 +218,14 @@ export default function DeployContractModal({
           "Contract saved, but quest completion failed. Refresh and check progress.",
       );
     } catch (error) {
-      console.error("[DeployContractModal] deploy failed:", error);
-      setErrorMessage(
-        error instanceof Error ? error.message : String(error),
-      );
+      if (isBaseMainnetSwitchRejected(error)) {
+        setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
+      } else {
+        console.error("[DeployContractModal] deploy failed:", error);
+        setErrorMessage(
+          error instanceof Error ? error.message : String(error),
+        );
+      }
     } finally {
       setIsDeploying(false);
     }

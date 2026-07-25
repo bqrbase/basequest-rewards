@@ -1,5 +1,10 @@
 import { BASEQUEST_BADGE_ABI } from "@/lib/contracts/abi/BaseQuestBadge";
 import {
+  BASE_MAINNET_REQUIRED_MESSAGE,
+  ensureBaseMainnet,
+  isBaseMainnetSwitchRejected,
+} from "@/lib/wallet/ensureBaseMainnet";
+import {
   decodeErrorResult,
   getAddress,
   isAddress,
@@ -140,11 +145,11 @@ function extractTokenIdFromReceipt(
 
 /**
  * Mint the BaseQuest Builder Badge with the connected wallet and wait for confirmation.
+ * Switches the wallet to Base Mainnet (8453) via ensureBaseMainnet before any write.
  */
 export async function claimBaseQuestBadge(
   params: ClaimBadgeParams,
 ): Promise<ClaimBadgeResult> {
-  const chainId = params.chainId ?? base.id;
   const contractAddress = getBaseQuestBadgeAddress();
 
   if (!contractAddress) {
@@ -156,15 +161,20 @@ export async function claimBaseQuestBadge(
     };
   }
 
-  if (!isBaseMainnet(chainId)) {
-    return {
-      ok: false,
-      status: "error",
-      message: "Switch to Base Mainnet to claim the NFT.",
-    };
-  }
-
   try {
+    const chainId = await ensureBaseMainnet({
+      config: params.config,
+      currentChainId: params.chainId,
+    });
+
+    if (!isBaseMainnet(chainId)) {
+      return {
+        ok: false,
+        status: "error",
+        message: BASE_MAINNET_REQUIRED_MESSAGE,
+      };
+    }
+
     const alreadyMinted = await readContract(params.config, {
       abi: BASEQUEST_BADGE_ABI,
       address: contractAddress,
@@ -220,6 +230,14 @@ export async function claimBaseQuestBadge(
       chainId,
     };
   } catch (error) {
+    if (isBaseMainnetSwitchRejected(error)) {
+      return {
+        ok: false,
+        status: "error",
+        message: BASE_MAINNET_REQUIRED_MESSAGE,
+      };
+    }
+
     console.error("[claimBaseQuestBadge]", error);
     return {
       ok: false,

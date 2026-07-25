@@ -8,17 +8,16 @@ import {
   X402_PREMIUM_TEST_PATH,
   X402_PRICE,
 } from "@/lib/x402/config";
+import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
 import { getBaseScanTxUrl, payPremiumTest } from "@/lib/x402/payPremiumTest";
 import { ui } from "@/lib/ui-styles";
+import {
+  BASE_MAINNET_REQUIRED_MESSAGE,
+  isBaseMainnetSwitchRejected,
+} from "@/lib/wallet/ensureBaseMainnet";
 import { useEffect, useId, useState } from "react";
 import type { Hash } from "viem";
-import { base } from "viem/chains";
-import {
-  useAccount,
-  useChainId,
-  useConfig,
-  useSwitchChain,
-} from "wagmi";
+import { useAccount, useConfig } from "wagmi";
 
 type X402PaymentModalProps = {
   open: boolean;
@@ -46,9 +45,8 @@ export default function X402PaymentModal({
 }: X402PaymentModalProps) {
   const titleId = useId();
   const config = useConfig();
-  const chainId = useChainId();
   const { address, status: walletStatus } = useAccount();
-  const { switchChainAsync } = useSwitchChain();
+  const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
 
   const [step, setStep] = useState<ModalStep>("start");
@@ -97,15 +95,7 @@ export default function X402PaymentModal({
     setStep("paying");
 
     try {
-      if (chainId !== base.id) {
-        try {
-          await switchChainAsync({ chainId: base.id });
-        } catch {
-          setErrorMessage("Please switch your wallet to Base Mainnet.");
-          setStep("start");
-          return;
-        }
-      }
+      await ensureBaseMainnetReady();
 
       // Calls GET /api/premium/test. On 402, @x402/fetch runs the payment flow.
       const result = await payPremiumTest({
@@ -202,10 +192,14 @@ export default function X402PaymentModal({
           "Payment saved, but quest completion failed. Refresh and check progress.",
       );
     } catch (error) {
-      console.error("[X402PaymentModal] payment failed:", error);
-      setErrorMessage(
-        error instanceof Error ? error.message : String(error),
-      );
+      if (isBaseMainnetSwitchRejected(error)) {
+        setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
+      } else {
+        console.error("[X402PaymentModal] payment failed:", error);
+        setErrorMessage(
+          error instanceof Error ? error.message : String(error),
+        );
+      }
       setStep("start");
     } finally {
       setIsPaying(false);

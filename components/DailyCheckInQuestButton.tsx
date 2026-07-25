@@ -5,9 +5,15 @@ import {
   DAILY_CHECK_IN_ADDRESS,
 } from "@/lib/contracts/DailyCheckIn";
 import { DATA_SUFFIX } from "@/lib/builderCode";
+import { useWriteContractOnBase } from "@/hooks/useWriteContractOnBase";
+import {
+  BASE_MAINNET_REQUIRED_MESSAGE,
+  isBaseMainnetSwitchRejected,
+} from "@/lib/wallet/ensureBaseMainnet";
 import { useState } from "react";
-import { useConfig, useWriteContract } from "wagmi";
+import { useConfig } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
+import { base } from "viem/chains";
 
 type DailyCheckInQuestButtonProps = {
   ctaLabel: string;
@@ -25,13 +31,15 @@ export default function DailyCheckInQuestButton({
   onSuccess,
 }: DailyCheckInQuestButtonProps) {
   const config = useConfig();
-  const { writeContractAsync } = useWriteContract();
+  const { writeContractAsync } = useWriteContractOnBase();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleCheckIn() {
     if (isSubmitting) return;
 
     setIsSubmitting(true);
+    setErrorMessage(null);
 
     try {
       const hash = await writeContractAsync({
@@ -43,11 +51,19 @@ export default function DailyCheckInQuestButton({
 
       await waitForTransactionReceipt(config, {
         hash,
+        chainId: base.id,
       });
 
       onSuccess?.();
     } catch (error) {
-      console.error("[DailyCheckInQuestButton] check-in failed:", error);
+      if (isBaseMainnetSwitchRejected(error)) {
+        setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
+      } else {
+        console.error("[DailyCheckInQuestButton] check-in failed:", error);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Daily Check-in failed.",
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -56,13 +72,18 @@ export default function DailyCheckInQuestButton({
   const isDisabled = disabled || isSubmitting;
 
   return (
-    <button
-      type="button"
-      disabled={isDisabled}
-      onClick={() => void handleCheckIn()}
-      className={`${isDisabled ? disabledClassName : buttonClassName} w-full`}
-    >
-      {isSubmitting ? "Checking in..." : ctaLabel}
-    </button>
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={isDisabled}
+        onClick={() => void handleCheckIn()}
+        className={`${isDisabled ? disabledClassName : buttonClassName} w-full`}
+      >
+        {isSubmitting ? "Checking in..." : ctaLabel}
+      </button>
+      {errorMessage ? (
+        <p className="text-center text-xs text-rose-300/90">{errorMessage}</p>
+      ) : null}
+    </div>
   );
 }
