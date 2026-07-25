@@ -1,5 +1,4 @@
 import {
-  getXBearerToken,
   getXClientId,
   getXClientSecret,
   X_TARGET_USERNAME,
@@ -85,6 +84,10 @@ export async function exchangeXCodeForToken(params: {
   return json;
 }
 
+/**
+ * GET https://api.x.com/2/users/me
+ * Requires the authenticated user's OAuth 2.0 access token.
+ */
 export async function fetchXAuthenticatedUser(
   accessToken: string,
 ): Promise<XUser> {
@@ -111,91 +114,24 @@ export async function fetchXAuthenticatedUser(
   return json.data;
 }
 
-let cachedTargetUserId: string | null = null;
-
 /**
- * Resolve @bqrbase user id via X API v2 (app bearer token).
- */
-export async function fetchTargetXUserId(): Promise<string> {
-  if (cachedTargetUserId) {
-    return cachedTargetUserId;
-  }
-
-  const rawBearerEnv = process.env.X_BEARER_TOKEN;
-  const tokenFingerprint = {
-    VERCEL_ENV: process.env.VERCEL_ENV ?? null,
-    "X_BEARER_TOKEN.length": rawBearerEnv?.length ?? null,
-    "X_BEARER_TOKEN.slice(0,8)": rawBearerEnv?.slice(0, 8) ?? null,
-    "X_BEARER_TOKEN.slice(-8)": rawBearerEnv?.slice(-8) ?? null,
-    "X_CLIENT_ID.slice(0,8)": process.env.X_CLIENT_ID?.slice(0, 8) ?? null,
-    X_CLIENT_SECRET: process.env.X_CLIENT_SECRET ? "loaded" : "missing",
-  };
-
-  // Fingerprint only — never log the full bearer token.
-  console.log("[x/api] env fingerprint before username lookup", tokenFingerprint);
-
-  if (!rawBearerEnv?.trim()) {
-    throw new Error(
-      JSON.stringify({
-        error: "x_bearer_token_missing",
-        message:
-          "X_BEARER_TOKEN is missing in this environment. Compare Vercel env with local curl.",
-        ...tokenFingerprint,
-      }),
-    );
-  }
-
-  const bearer = getXBearerToken();
-  const requestUrl = `${X_API}/2/users/by/username/${X_TARGET_USERNAME}?user.fields=username`;
-
-  const response = await fetch(requestUrl, {
-    headers: {
-      Authorization: `Bearer ${bearer}`,
-    },
-    cache: "no-store",
-  });
-
-  const responseText = await response.text();
-  let json: {
-    data?: { id: string; username: string };
-    errors?: Array<{ detail?: string; title?: string }>;
-  } = {};
-  try {
-    json = responseText ? (JSON.parse(responseText) as typeof json) : {};
-  } catch {
-    json = {};
-  }
-
-  if (!response.ok || !json.data?.id) {
-    throw new Error(
-      `Failed to resolve @${X_TARGET_USERNAME} (HTTP ${response.status}): ${responseText || "(empty body)"}`,
-    );
-  }
-
-  cachedTargetUserId = json.data.id;
-  return cachedTargetUserId;
-}
-
-/**
- * Real X API v2 verification: does the authenticated user follow @bqrbase?
- * Uses user.fields=connection_status on the target user lookup (user OAuth token).
- * No timers / click-wait heuristics.
+ * User-context follow verification for @bqrbase.
+ * Uses the authenticated user's OAuth access token only (no app bearer).
  *
- * Docs: GET /2/users/:id?user.fields=connection_status
+ * GET /2/users/by/username/:username?user.fields=connection_status
+ * Docs: connection_status includes "following" when the authed user follows them.
  */
-export async function doesUserFollowTarget(params: {
-  accessToken: string;
-  sourceUserId: string;
-  targetUserId: string;
-}): Promise<boolean> {
-  void params.sourceUserId;
-
-  const url = new URL(`${X_API}/2/users/${params.targetUserId}`);
+export async function doesAuthenticatedUserFollowTarget(
+  accessToken: string,
+): Promise<boolean> {
+  const url = new URL(
+    `${X_API}/2/users/by/username/${X_TARGET_USERNAME}`,
+  );
   url.searchParams.set("user.fields", "connection_status,username");
 
   const response = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${params.accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
     },
     cache: "no-store",
   });
@@ -213,7 +149,7 @@ export async function doesUserFollowTarget(params: {
   } = {};
 
   try {
-    json = responseText ? JSON.parse(responseText) : {};
+    json = responseText ? (JSON.parse(responseText) as typeof json) : {};
   } catch {
     json = {};
   }
@@ -223,7 +159,7 @@ export async function doesUserFollowTarget(params: {
       json.errors?.[0]?.detail ||
         json.detail ||
         json.title ||
-        `X API follow check failed (HTTP ${response.status})`,
+        `X API follow check failed (HTTP ${response.status}): ${responseText || "(empty body)"}`,
     );
   }
 

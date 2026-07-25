@@ -15,8 +15,8 @@ import {
   normalizeWalletAddress,
 } from "@/lib/x/config";
 import {
-  doesUserFollowTarget,
-  fetchTargetXUserId,
+  doesAuthenticatedUserFollowTarget,
+  fetchXAuthenticatedUser,
 } from "@/lib/x/api";
 import { readXSessionCookie } from "@/lib/x/session";
 
@@ -111,12 +111,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const targetUserId = await fetchTargetXUserId();
-    const following = await doesUserFollowTarget({
-      accessToken: session.accessToken,
-      sourceUserId: session.xUserId,
-      targetUserId,
-    });
+    // User-context only: OAuth access token → /2/users/me → follow check.
+    const xUser = await fetchXAuthenticatedUser(session.accessToken);
+    const following = await doesAuthenticatedUserFollowTarget(
+      session.accessToken,
+    );
 
     if (!following) {
       return NextResponse.json({
@@ -129,8 +128,8 @@ export async function POST(request: Request) {
 
     try {
       await saveXFollowVerification(walletAddress, {
-        twitterUserId: session.xUserId,
-        xUsername: session.xUsername,
+        twitterUserId: xUser.id,
+        xUsername: xUser.username,
         verifiedAt,
       });
     } catch (verifySaveError) {
@@ -168,10 +167,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: "completed",
       alreadyCompleted: false,
-      twitterUserId: session.xUserId,
+      twitterUserId: xUser.id,
       verifiedAt,
       progress: progressPayload(progress),
-      xUsername: session.xUsername,
+      xUsername: xUser.username,
     });
   } catch (error) {
     return NextResponse.json(
