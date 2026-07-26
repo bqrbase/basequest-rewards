@@ -18,14 +18,16 @@ const MOBILE_PRIMARY_NAV = [
 const MOBILE_WALLET_MENU = [
   { href: "/profile", label: "Profile" },
   { href: "/achievements", label: "Achievements" },
+  { href: "/referral", label: "Referral" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/settings", label: "Settings" },
 ] as const;
 
-/** Desktop wallet dropdown — unchanged */
+/** Desktop wallet dropdown */
 const DESKTOP_WALLET_MENU = [
   { href: "/profile", label: "Profile" },
   { href: "/achievements", label: "Achievements" },
+  { href: "/referral", label: "Referral" },
   { href: "/settings", label: "Settings" },
 ] as const;
 
@@ -34,6 +36,7 @@ const DESKTOP_NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
   { href: "/achievements", label: "Achievements" },
+  { href: "/referral", label: "Referral" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/base-wallet-score", label: "Wallet Score" },
   { href: "/profile", label: "Profile" },

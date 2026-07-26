@@ -1,5 +1,7 @@
 "use client";
 
+import ReferralCapture from "@/components/referrals/ReferralCapture";
+import ReferralLifecycle from "@/components/referrals/ReferralLifecycle";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -13,7 +15,7 @@ import {
   resolveWalletHost,
   type WalletHost,
 } from "@/lib/wagmi";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { WagmiProvider, type Config } from "wagmi";
 import { base } from "wagmi/chains";
 
@@ -125,6 +127,10 @@ export default function Providers({ children }: ProvidersProps) {
             },
           }}
         >
+          <Suspense fallback={null}>
+            <ReferralCapture />
+          </Suspense>
+          <ReferralLifecycle />
           {children}
         </OnchainKitProvider>
       </QueryClientProvider>

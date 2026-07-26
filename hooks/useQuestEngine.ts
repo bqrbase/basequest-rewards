@@ -15,6 +15,8 @@ import {
   type QuestProgress,
 } from "@/lib/quest-engine";
 import { getLevel } from "@/lib/levels";
+import { completeReferralClient } from "@/lib/referrals/client";
+import { REFERRAL_ONBOARDING_QUEST_ID } from "@/lib/referrals/constants";
 import { fetchQuests } from "@/lib/supabase/quests";
 import {
   fetchOrCreateUser,
@@ -23,6 +25,19 @@ import {
 } from "@/lib/supabase/users";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
+
+function maybeCompleteReferral(
+  walletAddress: string | undefined,
+  progress: QuestProgress,
+) {
+  if (!walletAddress) {
+    return;
+  }
+  if (!progress.completedQuestIds.includes(REFERRAL_ONBOARDING_QUEST_ID)) {
+    return;
+  }
+  void completeReferralClient(walletAddress);
+}
 
 function getStorageWalletAddress(address?: string | null) {
   return address?.toLowerCase() ?? null;
@@ -131,6 +146,7 @@ export function useQuestEngine() {
         }
 
         cacheProgressLocally(next, storageWalletAddress);
+        maybeCompleteReferral(walletAddress, next);
       } catch (error) {
         console.error("[useQuestEngine] syncUserProgress failed", error);
         if (cancelled) {
@@ -165,9 +181,11 @@ export function useQuestEngine() {
           void saveUserProgress(address, next)
             .then(() => {
               cacheProgressLocally(next, storageWalletAddress);
+              maybeCompleteReferral(address, next);
             })
             .catch(() => {
               cacheProgressLocally(next, storageWalletAddress);
+              maybeCompleteReferral(address, next);
             });
         } else {
           cacheProgressLocally(next, storageWalletAddress);
