@@ -46,7 +46,7 @@ type BridgeToBaseCardProps = {
 };
 
 const fieldClassName =
-  "w-full rounded-xl border border-white/12 bg-black/20 px-3 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-300/35 focus:bg-black/30 disabled:opacity-60";
+  "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none transition-colors focus:border-cyan-300/35 focus:bg-white/[0.06] disabled:opacity-60 sm:py-3";
 
 function isBusyStatus(status: BridgeStatus): boolean {
   return status === "bridging" || status === "waiting_destination";
@@ -327,26 +327,26 @@ export default function BridgeToBaseCard({
       toast={questToast}
       onDismiss={() => setQuestToast(null)}
     />
-    <div id="bridge-to-base" className="scroll-mt-24">
-      <GlassPanel className="p-5 sm:p-6">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div id="bridge-to-base" className="flex h-full min-h-0 scroll-mt-24 flex-col">
+      <GlassPanel className={`h-full ${ui.dashCardPad}`}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className={ui.statLabel}>Bridge</p>
-            <p className="mt-1 font-sans text-lg font-semibold text-white sm:text-xl">
+            <p className="mt-1 font-sans text-lg font-semibold tracking-tight text-white sm:text-xl">
               Bridge to Base
             </p>
           </div>
-          <div className="flex flex-col items-start gap-1 sm:items-end">
-            <p className="text-xs text-white/40">
-              Cross-chain · Powered by LI.FI
-            </p>
-            <p className="text-xs font-medium text-cyan-100/80">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider text-white/50">
+              Cross-chain · LI.FI
+            </span>
+            <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-500/10 px-2.5 py-1 text-[0.65rem] font-semibold text-cyan-100/90">
               {getBridgeStatusLabel(bridgeStatus)}
-            </p>
+            </span>
           </div>
         </div>
 
-        <div className="mt-5 space-y-3 sm:mt-6">
+        <div className="mt-4 flex flex-1 flex-col space-y-3 sm:mt-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
             <label className="block min-w-0">
               <span className={ui.statLabel}>Source chain</span>
@@ -555,7 +555,7 @@ export default function BridgeToBaseCard({
           ) : null}
         </div>
 
-        <div className="mt-5 space-y-3 border-t border-white/10 pt-5 sm:mt-6">
+        <div className="mt-auto space-y-3 border-t border-white/10 pt-4 sm:pt-5">
           {!isWalletConnected ? (
             <ConnectWalletButton
               connectLabel="Connect wallet to bridge"

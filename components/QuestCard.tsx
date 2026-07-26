@@ -79,36 +79,41 @@ export default function QuestCard({
   const isFollowFarcasterQuest = questId === "follow-farcaster";
 
   return (
-    <GlassPanel interactive className="flex h-full flex-col p-5 sm:p-6">
+    <GlassPanel
+      interactive
+      className={`h-full ${ui.dashCardPad}`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <span
-            className={`rounded-badge border px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest sm:px-3 sm:text-[0.65rem] ${statusBadgeStyles[status]}`}
+            className={`rounded-full border px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest sm:px-3 sm:text-[0.65rem] ${statusBadgeStyles[status]}`}
           >
             {statusLabels[status]}
           </span>
           {frequencyLabel ? (
-            <span className="rounded-badge border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest text-white/55 sm:px-3 sm:text-[0.65rem]">
+            <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest text-white/55 sm:px-3 sm:text-[0.65rem]">
               {frequencyLabel}
             </span>
           ) : null}
         </div>
-        <span className="shrink-0 rounded-badge border border-base-blue/40 bg-gradient-to-r from-base-blue/80 to-indigo-600/80 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white sm:px-3 sm:text-xs">
+        <span className="shrink-0 rounded-full border border-base-blue/35 bg-gradient-to-r from-base-blue/85 to-indigo-600/85 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white shadow-[0_0_16px_rgba(0,82,255,0.22)] sm:px-3 sm:text-xs">
           {reward}
         </span>
       </div>
 
-      <h3 className="mt-3.5 flex items-center gap-2.5 font-sans text-base font-semibold tracking-tight text-white sm:mt-4 sm:text-lg">
-        {icon ? (
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-cyan-100/90">
-            {icon}
-          </span>
-        ) : null}
-        <span>{title}</span>
-      </h3>
-      <p className="mt-2 flex-1 text-sm leading-6 text-white/55 sm:leading-7">
-        {description}
-      </p>
+      <div className="mt-4 flex flex-1 flex-col border-t border-white/[0.06] pt-4">
+        <h3 className="flex items-center gap-2.5 font-sans text-base font-semibold tracking-tight text-white sm:text-lg">
+          {icon ? (
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-cyan-100/90">
+              {icon}
+            </span>
+          ) : null}
+          <span>{title}</span>
+        </h3>
+        <p className="mt-2 flex-1 text-sm leading-6 text-white/55 sm:leading-7">
+          {description}
+        </p>
+      </div>
 
       <div className="pt-4 sm:pt-5">
         {isDailyCheckInQuest ? (

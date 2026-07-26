@@ -227,6 +227,7 @@ export function useQuestEngine() {
   return {
     hydrated,
     progressReady,
+    progress,
     quests,
     progressStats,
     totalXp: progress.totalXp,

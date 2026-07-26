@@ -30,10 +30,14 @@ export default function GlassPanel({
       : ui.glassCard;
 
   return (
-    <Tag className={`${surface} ${className}`} role={role} aria-live={ariaLive}>
+    <Tag
+      className={`flex flex-col ${surface} ${className}`}
+      role={role}
+      aria-live={ariaLive}
+    >
       <div aria-hidden className={ui.panelGlow} />
       <div aria-hidden className={ui.panelSheen} />
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">{children}</div>
     </Tag>
   );
 }

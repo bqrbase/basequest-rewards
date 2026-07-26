@@ -36,7 +36,7 @@ import { useAccount, useConfig } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 
 const fieldClassName =
-  "w-full rounded-xl border border-white/12 bg-black/20 px-3 py-3 text-sm text-white outline-none transition-colors focus:border-cyan-300/35 focus:bg-black/30 disabled:opacity-60";
+  "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-white outline-none transition-colors focus:border-cyan-300/35 focus:bg-white/[0.06] disabled:opacity-60 sm:py-3";
 
 type SwapStatus = "idle" | "submitting" | "success" | "error";
 
@@ -261,21 +261,21 @@ export default function QuickSwapCard({
       toast={questToast}
       onDismiss={() => setQuestToast(null)}
     />
-    <div id="quick-swap" className="scroll-mt-24">
-    <GlassPanel className="p-5 sm:p-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div id="quick-swap" className="flex h-full min-h-0 scroll-mt-24 flex-col">
+    <GlassPanel className={`h-full ${ui.dashCardPad}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className={ui.statLabel}>Trade</p>
-          <p className="mt-1 font-sans text-lg font-semibold text-white sm:text-xl">
+          <p className="mt-1 font-sans text-lg font-semibold tracking-tight text-white sm:text-xl">
             Quick Swap
           </p>
         </div>
-        <p className="text-xs text-white/40 sm:text-right">
-          Base Mainnet · Powered by LI.FI
-        </p>
+        <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider text-white/50">
+          Base · LI.FI
+        </span>
       </div>
 
-      <div className="mt-5 space-y-3 sm:mt-6">
+      <div className="mt-4 flex flex-1 flex-col space-y-3 sm:mt-5">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end sm:gap-3">
           <label className="block min-w-0">
             <span className={ui.statLabel}>From</span>
@@ -371,9 +371,9 @@ export default function QuickSwapCard({
           </div>
         </label>
 
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3.5 sm:p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            <div className="min-w-0">
+        <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.05] to-transparent p-3 sm:p-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="min-w-0 col-span-2 sm:col-span-1">
               <p className={ui.statLabel}>Estimated output</p>
               <p className="mt-1.5 truncate font-mono text-lg font-semibold tabular-nums text-white sm:text-xl">
                 {quoteLoading
@@ -384,7 +384,7 @@ export default function QuickSwapCard({
               </p>
             </div>
 
-            <div className="min-w-0 sm:text-right">
+            <div className="min-w-0 col-span-2 sm:col-span-1 sm:text-right">
               <p className={ui.statLabel}>Best route</p>
               <p className="mt-1.5 font-sans text-sm font-semibold text-cyan-100/90 sm:text-base">
                 {route?.provider ?? "—"}
@@ -447,7 +447,7 @@ export default function QuickSwapCard({
         ) : null}
       </div>
 
-      <div className="mt-5 border-t border-white/10 pt-5 sm:mt-6">
+      <div className="mt-auto border-t border-white/10 pt-4 sm:pt-5">
         {!isWalletConnected ? (
           <ConnectWalletButton
             connectLabel="Connect wallet to swap"

@@ -59,13 +59,23 @@ export default function LevelProgressBar({
       ) : null}
 
       <div
-        className={`h-2 w-full overflow-hidden rounded-badge bg-white/10 ${
-          showDetails ? "mt-3" : "mt-2"
+        className={`relative h-2.5 w-full overflow-hidden rounded-full bg-white/[0.08] ${
+          showDetails ? "mt-3" : "mt-3"
         }`}
+        role="progressbar"
+        aria-valuenow={Math.round(progressPercent)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Level progress"
       >
         <div
-          className="h-full rounded-badge bg-gradient-to-r from-base-blue to-cyan-400 transition-[width] duration-300 ease-out"
+          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-base-blue via-cyan-400 to-indigo-400 transition-[width] duration-700 ease-out"
           style={{ width: `${progressPercent}%` }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-1/3 animate-pulse rounded-full bg-white/10 blur-sm"
+          style={{ width: `${Math.max(progressPercent, 8)}%` }}
         />
       </div>
 
@@ -76,11 +86,18 @@ export default function LevelProgressBar({
       ) : null}
 
       {!showDetails ? (
-        <p className="mt-2 text-xs text-white/45">
-          {nextLevelXp !== null
-            ? `${Math.round(progressPercent)}% to Level ${level + 1}`
-            : `Level ${MAX_LEVEL} reached`}
-        </p>
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs text-white/45">
+          <span>
+            {nextLevelXp !== null
+              ? `${Math.round(progressPercent)}% to Level ${level + 1}`
+              : `Level ${MAX_LEVEL} reached`}
+          </span>
+          {nextLevelXp !== null ? (
+            <span className="tabular-nums">
+              {progressInLevel}/{levelSpan} XP
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

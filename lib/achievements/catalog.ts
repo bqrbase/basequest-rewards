@@ -1,0 +1,350 @@
+import type {
+  AchievementCategoryMeta,
+  AchievementDefinition,
+  BadgeDefinition,
+} from "@/lib/achievements/types";
+
+export const ACHIEVEMENT_CATEGORIES: AchievementCategoryMeta[] = [
+  {
+    id: "getting-started",
+    label: "Getting Started",
+    description: "First steps into BaseQuest Rewards.",
+  },
+  {
+    id: "trading",
+    label: "Trading",
+    description: "Swap and trade on Base Mainnet.",
+  },
+  {
+    id: "bridge",
+    label: "Bridge",
+    description: "Move assets onto Base.",
+  },
+  {
+    id: "builder",
+    label: "Builder",
+    description: "Ship onchain and grow your streak.",
+  },
+  {
+    id: "nft",
+    label: "NFT",
+    description: "Collect and engage with Base NFTs.",
+  },
+  {
+    id: "defi",
+    label: "DeFi",
+    description: "Explore Base DeFi protocols.",
+  },
+  {
+    id: "community",
+    label: "Community",
+    description: "Connect with builders across socials.",
+  },
+];
+
+/**
+ * Static achievement catalog. Progress rules map onto existing quest/progress
+ * signals where possible; `future` items stay locked until a later data source.
+ */
+export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
+  // Getting Started
+  {
+    id: "first-check-in",
+    category: "getting-started",
+    title: "First Check-In",
+    description: "Complete your first daily check-in on BaseQuest.",
+    rewardXp: 10,
+    icon: "☀️",
+    progress: { kind: "quest", questId: "daily-check-in" },
+  },
+  {
+    id: "explore-base",
+    category: "getting-started",
+    title: "Base Explorer",
+    description: "Open the Base ecosystem and start exploring apps.",
+    rewardXp: 15,
+    icon: "🧭",
+    progress: { kind: "quest", questId: "explore-base" },
+  },
+  {
+    id: "view-leaderboard",
+    category: "getting-started",
+    title: "Rank Watcher",
+    description: "Visit the leaderboard and see where builders stand.",
+    rewardXp: 10,
+    icon: "📊",
+    progress: { kind: "quest", questId: "view-leaderboard" },
+  },
+  {
+    id: "xp-100",
+    category: "getting-started",
+    title: "Century Club",
+    description: "Earn your first 100 XP across BaseQuest Rewards.",
+    rewardXp: 25,
+    icon: "💯",
+    progress: { kind: "xp", target: 100 },
+  },
+
+  // Trading
+  {
+    id: "first-swap",
+    category: "trading",
+    title: "First Swap",
+    description: "Complete your first token swap on Base via LI.FI.",
+    rewardXp: 25,
+    icon: "🔄",
+    progress: { kind: "quest", questId: "first-swap" },
+  },
+  {
+    id: "swap-veteran",
+    category: "trading",
+    title: "Swap Veteran",
+    description: "Complete multiple swaps on Base (coming soon).",
+    rewardXp: 50,
+    icon: "⚡",
+    progress: { kind: "future", target: 5 },
+  },
+  {
+    id: "volume-trader",
+    category: "trading",
+    title: "Volume Trader",
+    description: "Reach meaningful swap volume on Base (coming soon).",
+    rewardXp: 75,
+    icon: "📈",
+    progress: { kind: "future", target: 1000 },
+  },
+
+  // Bridge
+  {
+    id: "bridge-to-base",
+    category: "bridge",
+    title: "Bridge to Base",
+    description: "Bridge assets onto Base and confirm the destination tx.",
+    rewardXp: 30,
+    icon: "🌉",
+    progress: { kind: "quest", questId: "bridge-to-base" },
+  },
+  {
+    id: "multi-chain-bridger",
+    category: "bridge",
+    title: "Multi-Chain Bridger",
+    description: "Bridge from multiple source chains (coming soon).",
+    rewardXp: 60,
+    icon: "🌐",
+    progress: { kind: "future", target: 3 },
+  },
+  {
+    id: "bridge-whale",
+    category: "bridge",
+    title: "Bridge Whale",
+    description: "Bridge a larger amount onto Base (coming soon).",
+    rewardXp: 100,
+    icon: "🐋",
+    progress: { kind: "future", target: 1 },
+  },
+
+  // Builder
+  {
+    id: "deploy-contract",
+    category: "builder",
+    title: "Contract Deployer",
+    description: "Deploy a smart contract on Base Mainnet.",
+    rewardXp: 50,
+    icon: "🛠️",
+    progress: { kind: "quest", questId: "deploy-contract" },
+  },
+  {
+    id: "x402-payment",
+    category: "builder",
+    title: "x402 Pioneer",
+    description: "Complete an x402 payment flow on Base.",
+    rewardXp: 40,
+    icon: "💳",
+    progress: { kind: "quest", questId: "x402-payment" },
+  },
+  {
+    id: "streak-3",
+    category: "builder",
+    title: "3-Day Streak",
+    description: "Keep a 3-day engagement streak going.",
+    rewardXp: 20,
+    icon: "🔥",
+    progress: { kind: "streak", target: 3 },
+  },
+  {
+    id: "streak-7",
+    category: "builder",
+    title: "Week Warrior",
+    description: "Maintain a 7-day streak on BaseQuest.",
+    rewardXp: 45,
+    icon: "🗓️",
+    progress: { kind: "streak", target: 7 },
+  },
+  {
+    id: "quest-master",
+    category: "builder",
+    title: "Quest Master",
+    description: "Complete 5 quests across the BaseQuest catalog.",
+    rewardXp: 35,
+    icon: "🎯",
+    progress: { kind: "quest_count", target: 5 },
+  },
+
+  // NFT
+  {
+    id: "claim-nft",
+    category: "nft",
+    title: "NFT Claimer",
+    description: "Claim your first BaseQuest NFT on Base.",
+    rewardXp: 30,
+    icon: "🖼️",
+    progress: { kind: "quest", questId: "claim-nft" },
+  },
+  {
+    id: "nft-collector",
+    category: "nft",
+    title: "Collector",
+    description: "Hold multiple Base NFTs in your wallet (coming soon).",
+    rewardXp: 55,
+    icon: "🎨",
+    progress: { kind: "future", target: 3 },
+  },
+  {
+    id: "nft-curator",
+    category: "nft",
+    title: "Curator",
+    description: "Engage with Base NFT collections (coming soon).",
+    rewardXp: 70,
+    icon: "✨",
+    progress: { kind: "future", target: 1 },
+  },
+
+  // DeFi
+  {
+    id: "defi-first-touch",
+    category: "defi",
+    title: "DeFi First Touch",
+    description: "Interact with a known Base DeFi protocol (coming soon).",
+    rewardXp: 40,
+    icon: "🏦",
+    progress: { kind: "future", target: 1 },
+  },
+  {
+    id: "liquidity-provider",
+    category: "defi",
+    title: "Liquidity Provider",
+    description: "Provide liquidity on Base (coming soon).",
+    rewardXp: 80,
+    icon: "💧",
+    progress: { kind: "future", target: 1 },
+  },
+  {
+    id: "protocol-explorer",
+    category: "defi",
+    title: "Protocol Explorer",
+    description: "Touch multiple Base DeFi protocols (coming soon).",
+    rewardXp: 90,
+    icon: "🔬",
+    progress: { kind: "future", target: 5 },
+  },
+
+  // Community
+  {
+    id: "follow-x",
+    category: "community",
+    title: "X Follower",
+    description: "Follow BaseQuest Rewards on X.",
+    rewardXp: 15,
+    icon: "𝕏",
+    progress: { kind: "quest", questId: "follow-x" },
+  },
+  {
+    id: "follow-farcaster",
+    category: "community",
+    title: "Farcaster Friend",
+    description: "Follow the BaseQuest builder on Farcaster.",
+    rewardXp: 15,
+    icon: "🟣",
+    progress: { kind: "quest", questId: "follow-farcaster" },
+  },
+  {
+    id: "social-complete",
+    category: "community",
+    title: "Socially Onchain",
+    description: "Connect both X and Farcaster community quests.",
+    rewardXp: 30,
+    icon: "🤝",
+    progress: {
+      kind: "quests_all",
+      questIds: ["follow-x", "follow-farcaster"],
+    },
+  },
+  {
+    id: "community-champion",
+    category: "community",
+    title: "Community Champion",
+    description: "Become a recognized BaseQuest community member (coming soon).",
+    rewardXp: 100,
+    icon: "🏆",
+    progress: { kind: "future", target: 1 },
+  },
+];
+
+export const BADGE_DEFINITIONS: BadgeDefinition[] = [
+  {
+    id: "badge-newcomer",
+    title: "Newcomer",
+    description: "Complete your first check-in.",
+    icon: "🌱",
+    requires: ["first-check-in"],
+  },
+  {
+    id: "badge-trader",
+    title: "Base Trader",
+    description: "Complete your first Base swap.",
+    icon: "💱",
+    requires: ["first-swap"],
+  },
+  {
+    id: "badge-bridger",
+    title: "Base Bridger",
+    description: "Bridge assets onto Base.",
+    icon: "🚀",
+    requires: ["bridge-to-base"],
+  },
+  {
+    id: "badge-builder",
+    title: "Onchain Builder",
+    description: "Deploy a contract on Base.",
+    icon: "🧱",
+    requires: ["deploy-contract"],
+  },
+  {
+    id: "badge-collector",
+    title: "NFT Pioneer",
+    description: "Claim a BaseQuest NFT.",
+    icon: "🎖️",
+    requires: ["claim-nft"],
+  },
+  {
+    id: "badge-social",
+    title: "Social Spark",
+    description: "Follow on X and Farcaster.",
+    icon: "📣",
+    requires: ["follow-x", "follow-farcaster"],
+  },
+  {
+    id: "badge-streak",
+    title: "Streak Keeper",
+    description: "Hit a 3-day streak.",
+    icon: "🔥",
+    requires: ["streak-3"],
+  },
+  {
+    id: "badge-legend",
+    title: "BaseQuest Legend",
+    description: "Unlock core Getting Started + Trading milestones.",
+    icon: "👑",
+    requires: ["first-check-in", "first-swap", "bridge-to-base", "quest-master"],
+  },
+];
