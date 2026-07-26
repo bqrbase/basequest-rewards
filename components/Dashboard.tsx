@@ -17,6 +17,7 @@ import PageShell from "@/components/PageShell";
 import QuestCard from "@/components/QuestCard";
 import QuickSwapCard from "@/components/QuickSwapCard";
 import WalletStatusCard from "@/components/WalletStatusCard";
+import BqrBalanceCard from "@/components/dashboard/BqrBalanceCard";
 import DashboardLeaderboardPreview from "@/components/dashboard/DashboardLeaderboardPreview";
 import DashboardRecentActivity from "@/components/dashboard/DashboardRecentActivity";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
@@ -273,6 +274,17 @@ export default function Dashboard() {
                   </GlassPanel>
                 </Link>
               </div>
+            </div>
+          </section>
+
+          {/* BQR Balance */}
+          <section className={ui.dashSection}>
+            <div className={ui.sectionHeaderWrap}>
+              <p className={ui.sectionHeading}>Token</p>
+              <h2 className={ui.sectionTitle}>BQR Balance</h2>
+            </div>
+            <div className="grid grid-cols-1 items-stretch gap-4 md:max-w-xl">
+              <BqrBalanceCard />
             </div>
           </section>
 
