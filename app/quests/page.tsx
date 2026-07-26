@@ -5,6 +5,7 @@ import CommunityQuestCards, {
 } from "@/components/CommunityQuestCards";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
+import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import PageShell from "@/components/PageShell";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import QuestCard from "@/components/QuestCard";
@@ -89,6 +90,9 @@ export default function QuestsPage() {
               <X402PaymentQuestCard
                 quest={quests.find((quest) => quest.id === "x402-payment")}
                 onCompleted={applyServerProgress}
+              />
+              <FirstSwapQuestCard
+                quest={quests.find((quest) => quest.id === "first-swap")}
               />
               {filterBuilderQuests(quests).map((quest) => (
               <QuestCard

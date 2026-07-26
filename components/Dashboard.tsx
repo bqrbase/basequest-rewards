@@ -6,19 +6,21 @@ import CommunityQuestCards, {
 import ConnectWithBuilder from "@/components/ConnectWithBuilder";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
+import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import GlassPanel from "@/components/GlassPanel";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import LevelProgressBar from "@/components/LevelProgressBar";
 import LevelUpCelebration from "@/components/LevelUpCelebration";
 import PageShell from "@/components/PageShell";
 import QuestCard from "@/components/QuestCard";
+import QuickSwapCard from "@/components/QuickSwapCard";
 import WalletStatusCard from "@/components/WalletStatusCard";
 import { useQuestEngine } from "@/hooks/useQuestEngine";
 import { getLevel } from "@/lib/levels";
 import type { QuestId } from "@/lib/quest-engine";
 import { ui } from "@/lib/ui-styles";
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 function DashboardSkeleton() {
@@ -65,6 +67,20 @@ export default function Dashboard() {
     handleQuestAction,
     applyServerProgress,
   } = useQuestEngine();
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined") {
+      return;
+    }
+    if (window.location.hash !== "#quick-swap") {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("quick-swap")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [hydrated]);
 
   return (
     <PageShell>
@@ -162,6 +178,17 @@ export default function Dashboard() {
 
           <section>
             <div className={ui.sectionHeaderWrap}>
+              <p className={ui.sectionHeading}>Swap</p>
+              <h2 className={ui.sectionTitle}>Quick Swap</h2>
+              <p className={ui.sectionDescription}>
+                Swap tokens on Base Mainnet with live LI.FI routing.
+              </p>
+            </div>
+            <QuickSwapCard onFirstSwapQuestCompleted={applyServerProgress} />
+          </section>
+
+          <section>
+            <div className={ui.sectionHeaderWrap}>
               <p className={ui.sectionHeading}>Community</p>
               <h2 className={ui.sectionTitle}>Community Quests</h2>
               <p className={ui.sectionDescription}>
@@ -200,6 +227,10 @@ export default function Dashboard() {
               <X402PaymentQuestCard
                 quest={quests.find((quest) => quest.id === "x402-payment")}
                 onCompleted={applyServerProgress}
+              />
+              <FirstSwapQuestCard
+                quest={quests.find((quest) => quest.id === "first-swap")}
+                scrollToSwap
               />
               {filterBuilderQuests(quests).map((quest) => (
                 <QuestCard

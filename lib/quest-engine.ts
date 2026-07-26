@@ -7,7 +7,8 @@ export type QuestId =
   | "follow-farcaster"
   | "deploy-contract"
   | "claim-nft"
-  | "x402-payment";
+  | "x402-payment"
+  | "first-swap";
 
 const QUEST_IDS: QuestId[] = [
   "daily-check-in",
@@ -19,6 +20,7 @@ const QUEST_IDS: QuestId[] = [
   "deploy-contract",
   "claim-nft",
   "x402-payment",
+  "first-swap",
 ];
 
 /** Quests shown in Community section (excluded from Builder lists). */
@@ -32,6 +34,7 @@ export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = [
   "deploy-contract",
   "claim-nft",
   "x402-payment",
+  "first-swap",
 ];
 
 export function isCommunityEngineQuest(questId: QuestId): boolean {
@@ -120,6 +123,10 @@ const QUEST_ENGINE_METADATA: Record<
     prerequisites: [],
     ctaAvailable: "Start",
   },
+  "first-swap": {
+    prerequisites: [],
+    ctaAvailable: "Swap",
+  },
 };
 
 export const QUEST_DEFINITIONS: QuestDefinition[] = [
@@ -193,6 +200,14 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
       "Call the premium x402 endpoint and complete one successful payment on Base Mainnet.",
     rewardXp: 100,
     ...QUEST_ENGINE_METADATA["x402-payment"],
+  },
+  {
+    id: "first-swap",
+    title: "Complete your first swap",
+    description:
+      "Swap tokens on Base Mainnet with Quick Swap. Completes only after a confirmed on-chain transaction.",
+    rewardXp: 25,
+    ...QUEST_ENGINE_METADATA["first-swap"],
   },
 ];
 
