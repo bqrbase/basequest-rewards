@@ -6,7 +6,13 @@ import {
   type Config,
   type CreateConnectorFn,
 } from "wagmi";
-import { base } from "wagmi/chains";
+import {
+  arbitrum,
+  base,
+  mainnet,
+  optimism,
+  polygon,
+} from "wagmi/chains";
 import {
   baseAccount,
   coinbaseWallet,
@@ -18,6 +24,9 @@ import type { AppEnvironment } from "@/lib/miniapp/environment";
 export type WalletHost = "browser" | "farcaster" | "baseApp";
 
 const APP_NAME = "BaseQuest Rewards";
+
+/** Chains needed for Base app writes + Bridge to Base (LI.FI). */
+const SUPPORTED_CHAINS = [base, mainnet, arbitrum, optimism, polygon] as const;
 
 function createWalletConnectConnector() {
   return walletConnect({
@@ -38,10 +47,14 @@ function createSharedConfig(connectors: CreateConnectorFn[]): Config {
     storage: createStorage({
       storage: cookieStorage,
     }),
-    chains: [base],
+    chains: SUPPORTED_CHAINS,
     connectors,
     transports: {
       [base.id]: http(),
+      [mainnet.id]: http(),
+      [arbitrum.id]: http(),
+      [optimism.id]: http(),
+      [polygon.id]: http(),
     },
   });
 }

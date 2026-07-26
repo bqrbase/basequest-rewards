@@ -8,7 +8,8 @@ export type QuestId =
   | "deploy-contract"
   | "claim-nft"
   | "x402-payment"
-  | "first-swap";
+  | "first-swap"
+  | "bridge-to-base";
 
 const QUEST_IDS: QuestId[] = [
   "daily-check-in",
@@ -21,6 +22,7 @@ const QUEST_IDS: QuestId[] = [
   "claim-nft",
   "x402-payment",
   "first-swap",
+  "bridge-to-base",
 ];
 
 /** Quests shown in Community section (excluded from Builder lists). */
@@ -35,6 +37,7 @@ export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = [
   "claim-nft",
   "x402-payment",
   "first-swap",
+  "bridge-to-base",
 ];
 
 export function isCommunityEngineQuest(questId: QuestId): boolean {
@@ -127,6 +130,10 @@ const QUEST_ENGINE_METADATA: Record<
     prerequisites: [],
     ctaAvailable: "Swap",
   },
+  "bridge-to-base": {
+    prerequisites: [],
+    ctaAvailable: "Bridge",
+  },
 };
 
 export const QUEST_DEFINITIONS: QuestDefinition[] = [
@@ -208,6 +215,14 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
       "Swap tokens on Base Mainnet with Quick Swap. Completes only after a confirmed on-chain transaction.",
     rewardXp: 25,
     ...QUEST_ENGINE_METADATA["first-swap"],
+  },
+  {
+    id: "bridge-to-base",
+    title: "Bridge assets to Base",
+    description:
+      "Bridge assets to Base Mainnet. Completes only after destination settlement on Base (bridgeStatus completed).",
+    rewardXp: 30,
+    ...QUEST_ENGINE_METADATA["bridge-to-base"],
   },
 ];
 

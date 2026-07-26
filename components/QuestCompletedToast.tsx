@@ -6,6 +6,8 @@ import { useEffect } from "react";
 export type QuestCompletedToastData = {
   title: string;
   rewardXp: number;
+  /** Leading emoji in the toast headline. Defaults to celebration. */
+  emoji?: string;
 };
 
 type QuestCompletedToastProps = {
@@ -33,6 +35,8 @@ export default function QuestCompletedToast({
     return null;
   }
 
+  const emoji = toast.emoji ?? "🎉";
+
   return (
     <div className="pointer-events-none fixed inset-x-0 top-20 z-50 flex justify-center px-4 sm:top-24">
       <GlassPanel
@@ -41,7 +45,7 @@ export default function QuestCompletedToast({
         className="pointer-events-auto w-full max-w-sm border-emerald-400/30 p-4 text-center shadow-[0_0_28px_rgba(16,185,129,0.22)] sm:p-5"
       >
         <p className="font-sans text-lg font-bold text-white sm:text-xl">
-          🎉 Quest Completed
+          {emoji} Quest Completed
         </p>
         <p className="mt-1.5 text-sm text-white/70 sm:text-base">{toast.title}</p>
         <p className="mt-2 font-mono text-sm font-semibold tabular-nums text-emerald-200">

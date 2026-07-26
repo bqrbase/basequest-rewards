@@ -5,6 +5,7 @@ import CommunityQuestCards, {
 } from "@/components/CommunityQuestCards";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
+import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import PageShell from "@/components/PageShell";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
@@ -93,6 +94,9 @@ export default function QuestsPage() {
               />
               <FirstSwapQuestCard
                 quest={quests.find((quest) => quest.id === "first-swap")}
+              />
+              <BridgeToBaseQuestCard
+                quest={quests.find((quest) => quest.id === "bridge-to-base")}
               />
               {filterBuilderQuests(quests).map((quest) => (
               <QuestCard

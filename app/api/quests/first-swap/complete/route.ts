@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import {
-  completeOneTimeQuest,
-  QUEST_DEFINITIONS,
-  type QuestProgress,
-} from "@/lib/quest-engine";
+  awardOneTimeQuest,
+  progressResponse,
+} from "@/lib/quests/awardOneTimeQuest";
 import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
-import {
-  fetchOrCreateUser,
-  saveUserProgress,
-  userRowToProgress,
-} from "@/lib/supabase/users";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -72,42 +66,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await fetchOrCreateUser(walletAddress);
-    let progress: QuestProgress = user
-      ? userRowToProgress(user)
-      : {
-          totalXp: 0,
-          streak: 0,
-          lastCheckInDate: null,
-          completedQuestIds: [],
-        };
-
-    const alreadyCompleted = progress.completedQuestIds.includes("first-swap");
-
-    if (!alreadyCompleted) {
-      progress = completeOneTimeQuest(
-        progress,
-        "first-swap",
-        QUEST_DEFINITIONS,
-      );
-
-      try {
-        await saveUserProgress(walletAddress, progress);
-      } catch (progressError) {
-        console.error("[first-swap/complete] saveUserProgress", progressError);
-      }
-    }
+    const { progress, alreadyCompleted } = await awardOneTimeQuest({
+      walletAddress,
+      questId: "first-swap",
+    });
 
     return NextResponse.json({
       success: true,
       alreadyCompleted,
       txHash: verification.txHash.toLowerCase(),
-      progress: {
-        totalXp: progress.totalXp,
-        streak: progress.streak,
-        lastCheckInDate: progress.lastCheckInDate,
-        completedQuestIds: progress.completedQuestIds,
-      },
+      progress: progressResponse(progress),
     });
   } catch (error) {
     const info = extractSupabaseError(error);

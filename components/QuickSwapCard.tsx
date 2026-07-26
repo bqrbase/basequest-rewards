@@ -6,6 +6,7 @@ import QuestCompletedToast, {
   type QuestCompletedToastData,
 } from "@/components/QuestCompletedToast";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
+import { requestQuestCompletion } from "@/lib/quests/requestQuestCompletion";
 import type { QuestProgress } from "@/lib/quest-engine";
 import {
   formatPriceImpact,
@@ -168,39 +169,27 @@ export default function QuickSwapCard({
       return;
     }
 
-    try {
-      const response = await fetch("/api/quests/first-swap/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wallet: address,
-          txHash: confirmedTxHash,
-        }),
+    const result = await requestQuestCompletion({
+      endpoint: "/api/quests/first-swap/complete",
+      body: {
+        wallet: address,
+        txHash: confirmedTxHash,
+      },
+    });
+
+    if (!result.success || !result.progress) {
+      console.error("[QuickSwapCard] first-swap complete failed:", result.error);
+      return;
+    }
+
+    onFirstSwapQuestCompleted(result.progress);
+
+    if (!result.alreadyCompleted) {
+      setQuestToast({
+        title: "Complete your first swap",
+        rewardXp: 25,
+        emoji: "🎉",
       });
-
-      const json = (await response.json()) as {
-        success?: boolean;
-        alreadyCompleted?: boolean;
-        progress?: QuestProgress;
-        message?: string;
-        error?: string;
-      };
-
-      if (!response.ok || !json.success || !json.progress) {
-        console.error("[QuickSwapCard] first-swap complete failed:", json);
-        return;
-      }
-
-      onFirstSwapQuestCompleted(json.progress);
-
-      if (!json.alreadyCompleted) {
-        setQuestToast({
-          title: "Complete your first swap",
-          rewardXp: 25,
-        });
-      }
-    } catch (error) {
-      console.error("[QuickSwapCard] first-swap complete error:", error);
     }
   }
 

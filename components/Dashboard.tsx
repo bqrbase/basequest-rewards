@@ -6,6 +6,8 @@ import CommunityQuestCards, {
 import ConnectWithBuilder from "@/components/ConnectWithBuilder";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
+import BridgeToBaseCard from "@/components/BridgeToBaseCard";
+import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import GlassPanel from "@/components/GlassPanel";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
@@ -189,6 +191,18 @@ export default function Dashboard() {
 
           <section>
             <div className={ui.sectionHeaderWrap}>
+              <p className={ui.sectionHeading}>Bridge</p>
+              <h2 className={ui.sectionTitle}>Bridge to Base</h2>
+              <p className={ui.sectionDescription}>
+                Bridge assets from Ethereum, Arbitrum, Optimism, or Polygon to
+                Base with live LI.FI routing.
+              </p>
+            </div>
+            <BridgeToBaseCard onBridgeQuestCompleted={applyServerProgress} />
+          </section>
+
+          <section>
+            <div className={ui.sectionHeaderWrap}>
               <p className={ui.sectionHeading}>Community</p>
               <h2 className={ui.sectionTitle}>Community Quests</h2>
               <p className={ui.sectionDescription}>
@@ -231,6 +245,10 @@ export default function Dashboard() {
               <FirstSwapQuestCard
                 quest={quests.find((quest) => quest.id === "first-swap")}
                 scrollToSwap
+              />
+              <BridgeToBaseQuestCard
+                quest={quests.find((quest) => quest.id === "bridge-to-base")}
+                scrollToBridge
               />
               {filterBuilderQuests(quests).map((quest) => (
                 <QuestCard
