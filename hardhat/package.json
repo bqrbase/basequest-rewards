@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "hardhat test",
+    "compile": "hardhat compile --build-profile production",
+    "fund:distributor": "hardhat run scripts/fundRewardsDistributor.ts --network base --build-profile production"
   },
   "keywords": [],
   "author": "",

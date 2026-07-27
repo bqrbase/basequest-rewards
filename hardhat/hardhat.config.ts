@@ -37,4 +37,10 @@ export default defineConfig({
       accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
   },
+  // Etherscan API v2 — single key works for Basescan (chain 8453).
+  verify: {
+    etherscan: {
+      apiKey: configVariable("BASESCAN_API_KEY"),
+    },
+  },
 });

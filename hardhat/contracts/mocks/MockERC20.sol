@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+/**
+ * @dev Minimal mintable ERC-20 for RewardsDistributor tests (stands in for BQR).
+ */
+contract MockERC20 is ERC20 {
+    constructor() ERC20("Mock BQR", "BQR") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}

@@ -1,0 +1,30 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "contract": "RewardsDistributor",
+  "contractAddress": "0x8db0F6A276242787F8DA48360898Cc3B5FC0Bce9",
+  "transactionHash": "0x88212c3f9706e4c4caf7fccf16703d76eef97ebd0bcf31dc87f6f50be4086dd4",
+  "blockNumber": 49159714,
+  "deployer": "0x1819171c76D4B993ae6f14f43381b1Dfcd2AA09f",
+  "status": "success",
+  "constructorArguments": {
+    "initialOwner": "0x1819171c76D4B993ae6f14f43381b1Dfcd2AA09f",
+    "bqrToken": "0xB200000000000000000000Bf7E6dcf0cF466939a"
+  },
+  "compiler": {
+    "version": "0.8.28",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "buildProfile": "production",
+    "evmVersion": "cancun"
+  },
+  "explorers": {
+    "address": "https://basescan.org/address/0x8db0F6A276242787F8DA48360898Cc3B5FC0Bce9",
+    "tx": "https://basescan.org/tx/0x88212c3f9706e4c4caf7fccf16703d76eef97ebd0bcf31dc87f6f50be4086dd4"
+  },
+  "verifiedOnBasescan": true,
+  "verifiedOnBlockscout": true,
+  "deployedAt": "2026-07-26T23:35:00.000Z"
+}

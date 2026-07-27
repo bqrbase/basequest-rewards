@@ -7,15 +7,16 @@ import { base } from "viem/chains";
 import { useAccount, useReadContracts } from "wagmi";
 
 export type BqrBalanceState =
-  | { status: "disconnected" }
-  | { status: "loading" }
-  | { status: "error"; message: string }
+  | { status: "disconnected"; refetch: () => void }
+  | { status: "loading"; refetch: () => void }
+  | { status: "error"; message: string; refetch: () => void }
   | {
       status: "ready";
       raw: bigint;
       decimals: number;
       formatted: string;
       display: string;
+      refetch: () => void;
     };
 
 function formatBqrDisplay(raw: bigint, decimals: number): string {
@@ -74,12 +75,16 @@ export function useBqrBalance(): BqrBalanceState {
     },
   });
 
+  const refetch = () => {
+    void query.refetch();
+  };
+
   if (!isConnected || !address) {
-    return { status: "disconnected" };
+    return { status: "disconnected", refetch };
   }
 
   if (query.isLoading || query.isPending) {
-    return { status: "loading" };
+    return { status: "loading", refetch };
   }
 
   const balanceResult = query.data?.[0];
@@ -95,6 +100,7 @@ export function useBqrBalance(): BqrBalanceState {
     return {
       status: "error",
       message: "Unable to load BQR balance",
+      refetch,
     };
   }
 
@@ -109,5 +115,6 @@ export function useBqrBalance(): BqrBalanceState {
     decimals: safeDecimals,
     formatted,
     display: formatBqrDisplay(raw, safeDecimals),
+    refetch,
   };
 }

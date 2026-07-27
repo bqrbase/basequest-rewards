@@ -30,9 +30,17 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files / secrets (never commit real values)
+.env
+.env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.key
+id_rsa*
+credentials*.json
+service-account*.json
 
 # Hardhat nested project
 /hardhat/node_modules
@@ -43,9 +51,13 @@ yarn-error.log*
 /hardhat/types
 /hardhat/.gas-snapshot
 /hardhat/snapshots
+/hardhat/coverage.json
 
-# vercel
+# Local / editor / agent noise
 .vercel
+.cursor/
+.turbo/
+*.log
 
 # typescript
 *.tsbuildinfo

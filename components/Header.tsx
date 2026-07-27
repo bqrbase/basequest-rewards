@@ -11,7 +11,7 @@ import { useAccount, useDisconnect } from "wagmi";
 const MOBILE_PRIMARY_NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
-  { href: "/token", label: "Token" },
+  { href: "/rewards", label: "Rewards" },
 ] as const;
 
 /** Mobile wallet dropdown — exact order */
@@ -19,6 +19,7 @@ const MOBILE_WALLET_MENU = [
   { href: "/profile", label: "Profile" },
   { href: "/achievements", label: "Achievements" },
   { href: "/referral", label: "Referral" },
+  { href: "/rewards", label: "Rewards" },
   { href: "/token", label: "Token" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/base-wallet-score", label: "Wallet Score" },
@@ -30,6 +31,7 @@ const DESKTOP_WALLET_MENU = [
   { href: "/profile", label: "Profile" },
   { href: "/achievements", label: "Achievements" },
   { href: "/referral", label: "Referral" },
+  { href: "/rewards", label: "Rewards" },
   { href: "/token", label: "Token" },
   { href: "/settings", label: "Settings" },
 ] as const;
@@ -40,6 +42,7 @@ const DESKTOP_NAV = [
   { href: "/quests", label: "Quests" },
   { href: "/achievements", label: "Achievements" },
   { href: "/referral", label: "Referral" },
+  { href: "/rewards", label: "Rewards" },
   { href: "/token", label: "Token" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/base-wallet-score", label: "Wallet Score" },

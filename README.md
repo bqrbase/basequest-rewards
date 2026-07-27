@@ -48,6 +48,15 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect Cloud Project ID |
 | `NEXT_PUBLIC_APP_URL` | Public app URL (`https://basequest-rewards.vercel.app` in production) |
 | `NEXT_PUBLIC_BASEQUEST_BADGE_ADDRESS` | BaseQuest Builder Badge contract on Base Mainnet |
+| `NEXT_PUBLIC_REWARDS_DISTRIBUTOR` | RewardsDistributor contract on Base Mainnet (Merkle BQR claims) |
+| `REWARDS_ADMIN_SECRET` | Server-only secret for `/api/rewards/admin/*` (not a wallet key) |
+| `BASE_RPC_URL` | Optional Base RPC for server claim-status reads |
+
+**RewardsDistributor leaf / claimId (V1):**
+
+- Merkle leaf: `keccak256(abi.encodePacked(account, rewardId, amount))` (no `campaignId`)
+- Replay `claimId`: `keccak256(abi.encodePacked(campaignId, account, rewardId))`
+- Publish flow: snapshot → build (root) → external `createCampaign(root)` → link (`CampaignCreated` id)
 
 Also configure server-only keys for X OAuth, Neynar (Farcaster), and x402 / CDP as listed in `.env.example`.
 
