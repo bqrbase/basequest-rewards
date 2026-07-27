@@ -5,10 +5,10 @@ const APP_URL = "https://basequest.online";
 const farcasterManifest = {
   accountAssociation: {
     header:
-      "eyJmaWQiOjM2ODU5MSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDVFNjA0MzlGYThFMjQ4OTEwQjk5RjYzMzI2NjY4RjhiNDJlRjg2NjQifQ",
+      "eyJmaWQiOjM2ODU5MSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDcyNkMyMjY1RmQxODVhRTRCNTg4NWE5MkM5ODk2Y0M0OTY0MjcxNTMifQ",
     payload: "eyJkb21haW4iOiJiYXNlcXVlc3Qub25saW5lIn0",
     signature:
-      "fBibcer5cNPi9Cw//bUKeep/D2LnwYVYDEyrgrSB8L9UpAEXiQJX5Q2D6UcxWfLW5iqmhs+F0wYU2tpXSrvCCRs=",
+      "51JVTqMppuPyhxqucbEkd83YfnzWvSMM9p4ioyMVeiltz9cLhtpCXo31CiFeVGxulLdUPJcqgsciS0FWJ+6GuBs=",
   },
   miniapp: {
     version: "1",
