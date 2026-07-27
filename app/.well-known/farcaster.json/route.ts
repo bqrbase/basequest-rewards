@@ -19,7 +19,7 @@ const farcasterManifest = {
     imageUrl: `${APP_URL}/embed-image.png`,
     buttonTitle: "Open BaseQuest",
     splashImageUrl: `${APP_URL}/splash-icon.png`,
-    splashBackgroundColor: "#0052FF",
+    splashBackgroundColor: "#070b18",
     webhookUrl: `${APP_URL}/api/webhook`,
     subtitle: "Daily rewards on Base",
     description:
