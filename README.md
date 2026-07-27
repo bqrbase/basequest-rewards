@@ -2,7 +2,7 @@
 
 Daily rewards and engagement mini app for the Base ecosystem.
 
-**Production:** [https://basequest-rewards.vercel.app](https://basequest-rewards.vercel.app)
+**Production:** [https://basequest.online](https://basequest.online)
 
 **Network:** Base Mainnet (`chainId` 8453) only.
 
@@ -46,7 +46,7 @@ cp .env.example .env.local
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase service role key |
 | `NEXT_PUBLIC_ONCHAINKIT_API_KEY` | Coinbase Developer Platform OnchainKit key |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect Cloud Project ID |
-| `NEXT_PUBLIC_APP_URL` | Public app URL (`https://basequest-rewards.vercel.app` in production) |
+| `NEXT_PUBLIC_APP_URL` | Public app URL (`https://basequest.online` in production) |
 | `NEXT_PUBLIC_BASEQUEST_BADGE_ADDRESS` | BaseQuest Builder Badge contract on Base Mainnet |
 | `NEXT_PUBLIC_REWARDS_DISTRIBUTOR` | RewardsDistributor contract on Base Mainnet (Merkle BQR claims) |
 | `REWARDS_ADMIN_SECRET` | Server-only secret for `/api/rewards/admin/*` (not a wallet key) |
@@ -119,7 +119,7 @@ on conflict (id) do nothing;
 
 ## Production
 
-Live app: [https://basequest-rewards.vercel.app](https://basequest-rewards.vercel.app)
+Live app: [https://basequest.online](https://basequest.online)
 
 All on-chain quests (Daily Check-in, Deploy Contract, Claim NFT, x402) run on **Base Mainnet** only.
 
@@ -132,15 +132,17 @@ npm start
 
 1. Push the repo to GitHub.
 2. Import the project in Vercel.
-3. Add every variable from `.env.example` in the Vercel project settings (including `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` and `NEXT_PUBLIC_APP_URL=https://basequest-rewards.vercel.app`).
+3. Add every variable from `.env.example` in the Vercel project settings (including `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` and `NEXT_PUBLIC_APP_URL=https://basequest.online`).
 4. Deploy.
 
 ## Base Mini App / Farcaster manifest
 
-Production Mini App metadata lives at `public/.well-known/farcaster.json` and points at:
+Production Mini App metadata is served from `app/.well-known/farcaster.json/route.ts` at:
 
-- `homeUrl`: `https://basequest-rewards.vercel.app/`
-- `iconUrl`: `https://basequest-rewards.vercel.app/app-icon.png`
+- Manifest: `https://basequest.online/.well-known/farcaster.json`
+- `homeUrl`: `https://basequest.online/`
+- `iconUrl`: `https://basequest.online/app-icon.png`
+- `webhookUrl`: `https://basequest.online/api/webhook`
 
 Keep `NEXT_PUBLIC_APP_URL` aligned with that domain for X OAuth redirects (`/api/auth/x/callback`).
 
