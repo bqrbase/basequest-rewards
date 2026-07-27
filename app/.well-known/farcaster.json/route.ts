@@ -15,19 +15,30 @@ const farcasterManifest = {
     name: "BaseQuest Rewards",
     homeUrl: `${APP_URL}/`,
     iconUrl: `${APP_URL}/app-icon.png`,
-    imageUrl: `${APP_URL}/og-image.png`,
-    splashImageUrl: `${APP_URL}/splash.png`,
+    // Deprecated feed embed fields (kept for older clients).
+    imageUrl: `${APP_URL}/embed-image.png`,
+    buttonTitle: "Open BaseQuest",
+    splashImageUrl: `${APP_URL}/splash-icon.png`,
     splashBackgroundColor: "#0052FF",
+    webhookUrl: `${APP_URL}/api/webhook`,
     subtitle: "Daily rewards on Base",
     description:
       "Complete quests. Earn XP. Unlock rewards on the Base ecosystem.",
     primaryCategory: "finance",
+    tags: ["base", "quests", "rewards", "xp", "web3"],
     heroImageUrl: `${APP_URL}/hero.png`,
+    tagline: "Quests into rewards",
+    ogTitle: "BaseQuest Rewards",
+    ogDescription: "Complete quests. Earn XP. Unlock rewards on Base.",
+    ogImageUrl: `${APP_URL}/og-image.png`,
     screenshotUrls: [
       `${APP_URL}/screenshots/home.png`,
       `${APP_URL}/screenshots/quests.png`,
       `${APP_URL}/screenshots/leaderboard.png`,
     ],
+    requiredChains: ["eip155:8453"],
+    requiredCapabilities: ["wallet.getEthereumProvider"],
+    canonicalDomain: "basequest.online",
   },
 } as const;
 
