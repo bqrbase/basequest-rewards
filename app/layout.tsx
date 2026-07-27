@@ -14,9 +14,42 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const APP_URL = "https://basequest.online";
+const APP_TITLE = "BaseQuest Rewards";
+const APP_DESCRIPTION =
+  "Daily rewards and engagement for the Base ecosystem. Complete quests, earn XP, and unlock rewards.";
+
 export const metadata: Metadata = {
-  title: "BaseQuest Rewards",
-  description: "Daily rewards and engagement for the Base ecosystem.",
+  metadataBase: new URL(APP_URL),
+  title: APP_TITLE,
+  description: APP_DESCRIPTION,
+  applicationName: APP_TITLE,
+  icons: {
+    icon: [{ url: `${APP_URL}/app-icon.png`, sizes: "1024x1024", type: "image/png" }],
+    apple: [{ url: `${APP_URL}/app-icon.png`, sizes: "1024x1024", type: "image/png" }],
+    shortcut: `${APP_URL}/app-icon.png`,
+  },
+  openGraph: {
+    type: "website",
+    url: APP_URL,
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    siteName: APP_TITLE,
+    images: [
+      {
+        url: `${APP_URL}/og-image.png`,
+        width: 1200,
+        height: 630,
+        alt: "BaseQuest Rewards — Complete quests. Earn XP. Unlock rewards.",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [`${APP_URL}/og-image.png`],
+  },
   other: {
     "base:app_id": "6a5e99b82ef8a18fb639b9e7",
   },
