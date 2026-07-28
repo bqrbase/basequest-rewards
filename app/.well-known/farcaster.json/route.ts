@@ -15,8 +15,8 @@ const farcasterManifest = {
     name: "BaseQuest Rewards",
     homeUrl: `${APP_URL}/`,
     iconUrl: `${APP_URL}/app-icon.png`,
-    // Deprecated feed embed fields (kept for older clients).
-    imageUrl: `${APP_URL}/embed-image.png`,
+    // Feed embed preview: exact 3:2 (1200×800) with ≥120px safe padding.
+    imageUrl: `${APP_URL}/farcaster-embed.png`,
     buttonTitle: "Open BaseQuest",
     splashImageUrl: `${APP_URL}/splash-icon.png`,
     splashBackgroundColor: "#070b18",
