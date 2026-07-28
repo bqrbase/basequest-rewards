@@ -84,7 +84,7 @@ function getDesktopNavLinkClassName(isActive: boolean) {
 }
 
 function getMobileNavLinkClassName(isActive: boolean) {
-  return `flex shrink-0 items-center justify-center rounded-badge border px-1.5 py-1 text-center text-[0.55rem] font-semibold uppercase leading-none tracking-wide transition-all ${
+  return `flex min-w-0 flex-1 items-center justify-center rounded-badge border px-1 py-1 text-center text-[0.5rem] font-semibold uppercase leading-none tracking-wide transition-all sm:text-[0.55rem] sm:px-1.5 ${
     isActive
       ? "border-cyan-300/40 bg-gradient-to-r from-base-blue to-indigo-600 text-white shadow-[0_0_14px_rgba(0,82,255,0.45)]"
       : "border-white/10 bg-white/[0.04] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
@@ -287,10 +287,10 @@ export default function Header() {
           BQ
         </Link>
 
-        {/* Mobile: Dashboard · Quests · Wallet Score only */}
+        {/* Mobile: primary links fit the bar — no nested horizontal scroller */}
         <nav
           aria-label="Main navigation"
-          className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden"
+          className="flex min-w-0 flex-1 items-center justify-evenly gap-1 lg:hidden"
         >
           {MOBILE_PRIMARY_NAV.map((item) => (
             <Link

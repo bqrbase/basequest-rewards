@@ -12,7 +12,7 @@ type PageShellProps = {
  */
 export default function PageShell({ children }: PageShellProps) {
   return (
-    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-gradient-to-b from-[#070b18] via-[#0c1430] to-[#101038]">
+    <div className="relative flex min-h-dvh flex-col bg-gradient-to-b from-[#070b18] via-[#0c1430] to-[#101038]">
       <div
         aria-hidden
         className="pointer-events-none absolute -left-24 top-1/4 size-80 rounded-badge bg-base-blue/20 blur-3xl"

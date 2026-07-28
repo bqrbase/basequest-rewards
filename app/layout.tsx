@@ -63,9 +63,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
-      <body className="flex min-h-full flex-col overflow-x-hidden">
+      <body className="min-h-dvh">
         <Providers>
           <MiniAppReady />
           {children}
