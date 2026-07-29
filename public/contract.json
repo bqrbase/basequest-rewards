@@ -1,0 +1,10 @@
+{
+  "name": "BaseQuest Genesis",
+  "description": "BaseQuest Genesis is the founding NFT collection of the BaseQuest ecosystem on Base.",
+  "image": "https://basequest.online/images/contract.png",
+  "external_link": "https://basequest.online",
+  "seller_fee_basis_points": 500,
+  "fee_recipient": "0x1819171c76D4B993ae6f14f43381b1Dfcd2AA09f",
+  "banner_image": "https://basequest.online/images/banner.png",
+  "featured_image": "https://basequest.online/images/featured.png"
+}

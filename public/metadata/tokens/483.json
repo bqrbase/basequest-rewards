@@ -1,0 +1,20 @@
+{
+  "name": "BaseQuest Genesis #483",
+  "description": "BaseQuest Genesis is the founding NFT collection of the BaseQuest ecosystem on Base.",
+  "image": "https://basequest.online/images/genesis.png",
+  "external_url": "https://basequest.online",
+  "attributes": [
+    {
+      "trait_type": "Collection",
+      "value": "Genesis"
+    },
+    {
+      "trait_type": "Network",
+      "value": "Base"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Genesis"
+    }
+  ]
+}
