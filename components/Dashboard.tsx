@@ -20,6 +20,7 @@ import WalletStatusCard from "@/components/WalletStatusCard";
 import BqrBalanceCard from "@/components/dashboard/BqrBalanceCard";
 import DashboardLeaderboardPreview from "@/components/dashboard/DashboardLeaderboardPreview";
 import DashboardRecentActivity from "@/components/dashboard/DashboardRecentActivity";
+import GenesisCollectionCard from "@/components/dashboard/GenesisCollectionCard";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
 import ScoreRing from "@/components/ui/ScoreRing";
 import { useQuestEngine } from "@/hooks/useQuestEngine";
@@ -285,6 +286,17 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-1 items-stretch gap-4 md:max-w-xl">
               <BqrBalanceCard />
+            </div>
+          </section>
+
+          {/* Genesis Collection */}
+          <section className={ui.dashSection}>
+            <div className={ui.sectionHeaderWrap}>
+              <p className={ui.sectionHeading}>NFT</p>
+              <h2 className={ui.sectionTitle}>Genesis Collection</h2>
+            </div>
+            <div className="grid grid-cols-1 items-stretch gap-4">
+              <GenesisCollectionCard />
             </div>
           </section>
 

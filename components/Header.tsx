@@ -11,6 +11,7 @@ import { useAccount, useDisconnect } from "wagmi";
 const MOBILE_PRIMARY_NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
+  { href: "/genesis", label: "Genesis" },
   { href: "/rewards", label: "Rewards" },
 ] as const;
 
@@ -44,6 +45,7 @@ const DESKTOP_NAV = [
   { href: "/referral", label: "Referral" },
   { href: "/rewards", label: "Rewards" },
   { href: "/token", label: "Token" },
+  { href: "/genesis", label: "Genesis" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/base-wallet-score", label: "Wallet Score" },
   { href: "/profile", label: "Profile" },
