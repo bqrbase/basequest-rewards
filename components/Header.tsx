@@ -78,7 +78,7 @@ function isActiveRoute(pathname: string, href: string) {
 }
 
 function getDesktopNavLinkClassName(isActive: boolean) {
-  return `flex min-w-0 flex-none shrink-0 items-center justify-center rounded-badge border px-2 py-1 text-center text-[0.6rem] font-semibold uppercase leading-none tracking-widest transition-all ${
+  return `flex shrink-0 items-center justify-center whitespace-nowrap rounded-badge border px-2 py-1 text-center text-[0.6rem] font-semibold uppercase leading-none tracking-widest transition-all ${
     isActive
       ? "border-cyan-300/40 bg-gradient-to-r from-base-blue to-indigo-600 text-white shadow-[0_0_14px_rgba(0,82,255,0.45)]"
       : "border-white/10 bg-white/[0.04] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
@@ -310,25 +310,41 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Desktop: full navigation unchanged */}
+        {/* Desktop: wrapped two-row navigation */}
         <nav
           aria-label="Main navigation"
-          className="hidden lg:col-start-2 lg:flex lg:w-auto lg:flex-none lg:items-center lg:justify-center lg:justify-self-center lg:gap-1.5"
+          className="hidden lg:col-start-2 lg:flex lg:w-full lg:flex-wrap lg:items-center lg:justify-center lg:justify-self-center lg:gap-x-1.5"
         >
-          {DESKTOP_NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={
-                isActiveRoute(pathname, item.href) ? "page" : undefined
-              }
-              className={getDesktopNavLinkClassName(
-                isActiveRoute(pathname, item.href),
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {DESKTOP_NAV.flatMap((item, index) => {
+            const link = (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={
+                  isActiveRoute(pathname, item.href) ? "page" : undefined
+                }
+                className={getDesktopNavLinkClassName(
+                  isActiveRoute(pathname, item.href),
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+
+            // Wrap after Token so desktop shows two balanced centered rows.
+            if (index === 6) {
+              return [
+                <span
+                  key="desktop-nav-wrap"
+                  aria-hidden
+                  className="h-3 w-full basis-full"
+                />,
+                link,
+              ];
+            }
+
+            return [link];
+          })}
         </nav>
 
         <div className="flex shrink-0 items-center lg:col-start-3 lg:justify-self-end">
