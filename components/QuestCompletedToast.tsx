@@ -1,5 +1,6 @@
 "use client";
 
+import GenesisXPRewardDisplay from "@/components/genesis/GenesisXPRewardDisplay";
 import GlassPanel from "@/components/GlassPanel";
 import { useEffect } from "react";
 
@@ -17,6 +18,7 @@ type QuestCompletedToastProps = {
 
 /**
  * Lightweight success toast for one-time quest completions.
+ * Shows Genesis bonus breakdown when access allows (display only).
  */
 export default function QuestCompletedToast({
   toast,
@@ -48,9 +50,14 @@ export default function QuestCompletedToast({
           {emoji} Quest Completed
         </p>
         <p className="mt-1.5 text-sm text-white/70 sm:text-base">{toast.title}</p>
-        <p className="mt-2 font-mono text-sm font-semibold tabular-nums text-emerald-200">
-          +{toast.rewardXp} XP
-        </p>
+        <div className="mt-3 flex justify-center">
+          <GenesisXPRewardDisplay
+            baseXP={toast.rewardXp}
+            rewardLabel={`+${toast.rewardXp} XP`}
+            variant="stacked"
+            className="w-full text-left"
+          />
+        </div>
       </GlassPanel>
     </div>
   );

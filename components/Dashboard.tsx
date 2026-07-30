@@ -21,6 +21,7 @@ import BqrBalanceCard from "@/components/dashboard/BqrBalanceCard";
 import DashboardLeaderboardPreview from "@/components/dashboard/DashboardLeaderboardPreview";
 import DashboardRecentActivity from "@/components/dashboard/DashboardRecentActivity";
 import GenesisCollectionCard from "@/components/dashboard/GenesisCollectionCard";
+import GenesisBonusActiveBadge from "@/components/genesis/GenesisBonusActiveBadge";
 import GenesisQuestsSection from "@/components/genesis/GenesisQuestsSection";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
 import ScoreRing from "@/components/ui/ScoreRing";
@@ -142,7 +143,10 @@ export default function Dashboard() {
           <section className={ui.dashSection}>
             <div className={ui.sectionHeaderWrap}>
               <p className={ui.sectionHeading}>Overview</p>
-              <h2 className={ui.sectionTitle}>Your Progress</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className={ui.sectionTitle}>Your Progress</h2>
+                <GenesisBonusActiveBadge />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-[minmax(0,1.35fr)_minmax(14rem,0.85fr)] md:gap-4 lg:gap-5">

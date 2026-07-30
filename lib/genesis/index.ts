@@ -43,3 +43,12 @@ export type {
   GenesisAccessPermissions,
   GenesisAccessState,
 } from "@/lib/genesis/access";
+export {
+  calculateGenesisXP,
+  GENESIS_XP_BONUS_RATE,
+  parseRewardXpLabel,
+} from "@/lib/genesis/xp";
+export type {
+  GenesisXPAccessInput,
+  GenesisXPBreakdown,
+} from "@/lib/genesis/xp";

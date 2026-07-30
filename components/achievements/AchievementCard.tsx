@@ -1,4 +1,5 @@
 import AchievementProgressBar from "@/components/achievements/AchievementProgressBar";
+import GenesisXPRewardDisplay from "@/components/genesis/GenesisXPRewardDisplay";
 import GlassPanel from "@/components/GlassPanel";
 import type {
   AchievementStatus,
@@ -46,15 +47,17 @@ export default function AchievementCard({ achievement }: AchievementCardProps) {
         >
           {achievement.icon}
         </span>
-        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex flex-col items-end gap-1.5">
           <span
             className={`rounded-full border px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest sm:text-[0.65rem] ${statusBadgeStyles[achievement.status]}`}
           >
             {statusLabels[achievement.status]}
           </span>
-          <span className="rounded-full border border-base-blue/35 bg-gradient-to-r from-base-blue/85 to-indigo-600/85 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white shadow-[0_0_16px_rgba(0,82,255,0.22)]">
-            +{achievement.rewardXp} XP
-          </span>
+          <GenesisXPRewardDisplay
+            baseXP={achievement.rewardXp}
+            rewardLabel={`+${achievement.rewardXp} XP`}
+            variant="compact"
+          />
         </div>
       </div>
 

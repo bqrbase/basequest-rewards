@@ -1,6 +1,7 @@
 "use client";
 
 import GenesisBadge from "@/components/genesis/GenesisBadge";
+import GenesisBonusActiveBadge from "@/components/genesis/GenesisBonusActiveBadge";
 import ProfileAvatar from "@/components/profile/ProfileAvatar";
 import GlassPanel from "@/components/GlassPanel";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
@@ -115,6 +116,9 @@ export default function ProfileHero({
             <p className="mt-1 font-sans text-lg font-bold tabular-nums text-cyan-100 sm:text-xl">
               <AnimatedCounter value={totalXp} />
             </p>
+            <div className="mt-2 flex justify-center">
+              <GenesisBonusActiveBadge address={address as Address} />
+            </div>
           </div>
           <Link
             href="/base-wallet-score"

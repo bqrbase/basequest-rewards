@@ -9,6 +9,7 @@ import {
 import DailyCheckInQuestButton from "@/components/DailyCheckInQuestButton";
 import FollowFarcasterQuestButton from "@/components/FollowFarcasterQuestButton";
 import FollowXQuestButton from "@/components/FollowXQuestButton";
+import GenesisXPRewardDisplay from "@/components/genesis/GenesisXPRewardDisplay";
 import GlassPanel from "@/components/GlassPanel";
 import type { QuestProgress } from "@/lib/quest-engine";
 import { ui } from "@/lib/ui-styles";
@@ -20,6 +21,8 @@ type QuestCardProps = {
   title: string;
   description: string;
   reward: string;
+  /** Optional numeric base XP for Genesis bonus display. */
+  rewardXp?: number;
   status: QuestStatus;
   ctaLabel: string;
   onAction?: () => void;
@@ -65,6 +68,7 @@ export default function QuestCard({
   title,
   description,
   reward,
+  rewardXp,
   status,
   ctaLabel,
   onAction,
@@ -96,9 +100,11 @@ export default function QuestCard({
             </span>
           ) : null}
         </div>
-        <span className="shrink-0 rounded-full border border-base-blue/35 bg-gradient-to-r from-base-blue/85 to-indigo-600/85 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-white shadow-[0_0_16px_rgba(0,82,255,0.22)] sm:px-3 sm:text-xs">
-          {reward}
-        </span>
+        <GenesisXPRewardDisplay
+          baseXP={rewardXp}
+          rewardLabel={reward}
+          variant="compact"
+        />
       </div>
 
       <div className="mt-4 flex flex-1 flex-col border-t border-white/[0.06] pt-4">

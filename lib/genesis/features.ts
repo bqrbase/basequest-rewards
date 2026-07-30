@@ -6,6 +6,7 @@ import type {
 import { BASEQUEST_GENESIS_HOLDER_TOKEN_ID } from "@/lib/contracts/abi/BaseQuestGenesis";
 import { resolveGenesisAccess } from "@/lib/genesis/access/permissions";
 import { resolveGenesisExclusiveQuestIds } from "@/lib/genesis/quests/provider";
+import { GENESIS_XP_BONUS_RATE } from "@/lib/genesis/xp";
 
 export { BASEQUEST_GENESIS_HOLDER_TOKEN_ID as GENESIS_HOLDER_TOKEN_ID };
 
@@ -61,11 +62,13 @@ export function isHoldingGenesis(balance: bigint): boolean {
 export function resolveGenesisPerks(
   isGenesisHolder: boolean,
 ): GenesisPerkResolution {
-  const { canAccessGenesisQuests } = resolveGenesisAccess(isGenesisHolder);
+  const { canAccessGenesisQuests, canReceiveGenesisXPBonus } =
+    resolveGenesisAccess(isGenesisHolder);
 
   return {
     isGenesisHolder,
-    xpBonusMultiplier: null,
+    // Display/architecture only — core XP storage is unchanged.
+    xpBonusMultiplier: canReceiveGenesisXPBonus ? 1 + GENESIS_XP_BONUS_RATE : null,
     exclusiveQuestIds: resolveGenesisExclusiveQuestIds(canAccessGenesisQuests),
     airdropEligible: false,
   };
