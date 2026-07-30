@@ -3,6 +3,7 @@
   "description": "BaseQuest Genesis is the founding NFT collection of the BaseQuest ecosystem on Base.",
   "image": "https://basequest.online/images/genesis.png",
   "external_url": "https://basequest.online",
+  "background_color": "0052FF",
   "attributes": [
     {
       "trait_type": "Collection",
