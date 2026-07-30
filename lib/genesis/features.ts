@@ -20,8 +20,8 @@ export const GENESIS_FEATURES: readonly GenesisFeatureDefinition[] = [
     id: "xp-bonus",
     title: "XP Bonus",
     description:
-      "Future XP advantages for Genesis holders across BaseQuest experiences.",
-    status: "planned",
+      "Genesis holders earn 20% more XP on awarded quests (server-persisted).",
+    status: "active",
   },
   {
     id: "exclusive-quests",

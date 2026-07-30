@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
 import {
-  completeOneTimeQuest,
-  QUEST_DEFINITIONS,
-  type QuestProgress,
-} from "@/lib/quest-engine";
+  awardOneTimeQuest,
+  progressResponse,
+} from "@/lib/quests/awardOneTimeQuest";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
-import {
-  fetchOrCreateUser,
-  saveUserProgress,
-  userRowToProgress,
-} from "@/lib/supabase/users";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -22,8 +17,8 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/deploy-contract/complete
- * Completes the deploy-contract quest and awards XP.
- * Contract persistence is handled by POST /api/contracts/save.
+ * Completes the deploy-contract quest and awards XP (with Genesis bonus when eligible).
+ * Requires wallet ownership session. Contract persistence: POST /api/contracts/save.
  */
 export async function POST(request: Request) {
   try {
@@ -48,47 +43,25 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-
-    const user = await fetchOrCreateUser(walletAddress);
-    let progress: QuestProgress = user
-      ? userRowToProgress(user)
-      : {
-          totalXp: 0,
-          streak: 0,
-          lastCheckInDate: null,
-          completedQuestIds: [],
-        };
-
-    const alreadyCompleted =
-      progress.completedQuestIds.includes("deploy-contract");
-
-    if (!alreadyCompleted) {
-      progress = completeOneTimeQuest(
-        progress,
-        "deploy-contract",
-        QUEST_DEFINITIONS,
-      );
-
-      try {
-        await saveUserProgress(walletAddress, progress);
-      } catch (progressError) {
-        console.error(
-          "[deploy-contract/complete] saveUserProgress",
-          progressError,
-        );
-      }
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
     }
+
+    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
+      await awardOneTimeQuest({
+        walletAddress,
+        questId: "deploy-contract",
+      });
 
     return NextResponse.json({
       success: true,
       alreadyCompleted,
       contractAddress: contractAddress?.toLowerCase() ?? null,
-      progress: {
-        totalXp: progress.totalXp,
-        streak: progress.streak,
-        lastCheckInDate: progress.lastCheckInDate,
-        completedQuestIds: progress.completedQuestIds,
-      },
+      baseXP,
+      bonusXP,
+      awardedXP,
+      progress: progressResponse(progress),
     });
   } catch (error) {
     const info = extractSupabaseError(error);

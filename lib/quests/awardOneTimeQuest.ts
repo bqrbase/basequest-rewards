@@ -1,29 +1,36 @@
+import { resolveServerGenesisAccess } from "@/lib/genesis/holder/server";
+import { awardGenesisAdjustedXp } from "@/lib/genesis/xp/award";
 import {
   completeOneTimeQuest,
+  findQuestDefinition,
+  performDailyCheckIn,
   QUEST_DEFINITIONS,
   type QuestId,
   type QuestProgress,
 } from "@/lib/quest-engine";
 import {
-  fetchOrCreateUser,
-  saveUserProgress,
-  userRowToProgress,
-} from "@/lib/supabase/users";
+  fetchOrCreateUserAdmin,
+  saveUserProgressAdmin,
+} from "@/lib/supabase/usersServer";
+import { userRowToProgress } from "@/lib/supabase/users";
 
 export type AwardOneTimeQuestResult = {
   progress: QuestProgress;
   alreadyCompleted: boolean;
+  baseXP: number;
+  bonusXP: number;
+  awardedXP: number;
 };
 
 /**
- * Shared server helper: award a one-time quest via the existing quest engine
- * and persist to Supabase users.completed_quests / total_xp.
+ * Shared server helper: award a quest via the quest engine with Genesis XP
+ * bonus applied when the wallet is eligible, then persist via service role.
  */
 export async function awardOneTimeQuest(params: {
   walletAddress: string;
   questId: QuestId;
 }): Promise<AwardOneTimeQuestResult> {
-  const user = await fetchOrCreateUser(params.walletAddress);
+  const user = await fetchOrCreateUserAdmin(params.walletAddress);
   let progress: QuestProgress = user
     ? userRowToProgress(user)
     : {
@@ -34,25 +41,73 @@ export async function awardOneTimeQuest(params: {
       };
 
   const alreadyCompleted = progress.completedQuestIds.includes(params.questId);
+  const definition = findQuestDefinition(params.questId, QUEST_DEFINITIONS);
+  const baseXP = definition?.rewardXp ?? 0;
 
-  if (!alreadyCompleted) {
-    progress = completeOneTimeQuest(
+  if (!definition) {
+    return {
       progress,
-      params.questId,
-      QUEST_DEFINITIONS,
-    );
-
-    try {
-      await saveUserProgress(params.walletAddress, progress);
-    } catch (progressError) {
-      console.error(
-        `[awardOneTimeQuest] saveUserProgress (${params.questId})`,
-        progressError,
-      );
-    }
+      alreadyCompleted,
+      baseXP: 0,
+      bonusXP: 0,
+      awardedXP: 0,
+    };
   }
 
-  return { progress, alreadyCompleted };
+  const access = await resolveServerGenesisAccess(params.walletAddress);
+  const { bonusXP, totalXP: awardedXP } = awardGenesisAdjustedXp(baseXP, {
+    canReceiveGenesisXPBonus: access.canReceiveGenesisXPBonus,
+  });
+
+  // Daily check-in is recurring — gate on date, not completedQuestIds alone.
+  if (params.questId === "daily-check-in") {
+    const beforeXp = progress.totalXp;
+    progress = performDailyCheckIn(progress, undefined, QUEST_DEFINITIONS, {
+      rewardXpOverride: awardedXP,
+    });
+    const didAward = progress.totalXp > beforeXp;
+
+    if (didAward) {
+      await saveUserProgressAdmin(params.walletAddress, progress);
+    }
+
+    return {
+      progress,
+      alreadyCompleted: !didAward,
+      baseXP,
+      bonusXP: didAward ? bonusXP : 0,
+      awardedXP: didAward ? awardedXP : 0,
+    };
+  }
+
+  if (alreadyCompleted) {
+    return {
+      progress,
+      alreadyCompleted: true,
+      baseXP,
+      bonusXP: 0,
+      awardedXP: 0,
+    };
+  }
+
+  progress = completeOneTimeQuest(
+    progress,
+    params.questId,
+    QUEST_DEFINITIONS,
+    { rewardXpOverride: awardedXP },
+  );
+
+  try {
+    await saveUserProgressAdmin(params.walletAddress, progress);
+  } catch (progressError) {
+    console.error(
+      `[awardOneTimeQuest] saveUserProgressAdmin (${params.questId})`,
+      progressError,
+    );
+    throw progressError;
+  }
+
+  return { progress, alreadyCompleted: false, baseXP, bonusXP, awardedXP };
 }
 
 export function progressResponse(progress: QuestProgress) {

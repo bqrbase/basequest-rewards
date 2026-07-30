@@ -18,6 +18,7 @@ export async function requestQuestCompletion(params: {
     const response = await fetch(params.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(params.body),
     });
 

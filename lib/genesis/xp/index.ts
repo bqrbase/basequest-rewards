@@ -7,6 +7,7 @@ export {
   calculateGenesisXP,
   parseRewardXpLabel,
 } from "@/lib/genesis/xp/calculateGenesisXP";
+export { awardGenesisAdjustedXp } from "@/lib/genesis/xp/award";
 export {
   GENESIS_XP_BONUS_RATE,
   type GenesisXPAccessInput,

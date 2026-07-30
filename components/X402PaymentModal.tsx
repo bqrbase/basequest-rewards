@@ -112,6 +112,7 @@ export default function X402PaymentModal({
       const saveResponse = await fetch("/api/x402/payments/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           wallet: address,
           txHash: result.txHash,
@@ -165,6 +166,7 @@ export default function X402PaymentModal({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             wallet: address,
             txHash: result.txHash,

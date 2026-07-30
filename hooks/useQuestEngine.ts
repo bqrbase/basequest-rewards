@@ -18,11 +18,9 @@ import { getLevel } from "@/lib/levels";
 import { completeReferralClient } from "@/lib/referrals/client";
 import { REFERRAL_ONBOARDING_QUEST_ID } from "@/lib/referrals/constants";
 import { fetchQuests } from "@/lib/supabase/quests";
-import {
-  fetchOrCreateUser,
-  saveUserProgress,
-  userRowToProgress,
-} from "@/lib/supabase/users";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { calculateGenesisXP } from "@/lib/genesis/xp";
+import { useGenesisAccess } from "@/hooks/useGenesisAccess";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 
@@ -50,6 +48,50 @@ function cacheProgressLocally(
   saveProgress(normalizeStreak(progress), walletAddress);
 }
 
+const SERVER_OWNED_QUESTS = new Set<QuestId>([
+  "daily-check-in",
+  "view-leaderboard",
+  "build-streak",
+  "explore-base",
+]);
+
+async function syncProgressFromServer(wallet: string): Promise<QuestProgress | null> {
+  const response = await fetch("/api/progress/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ wallet }),
+  });
+  const json = (await response.json()) as {
+    success?: boolean;
+    progress?: QuestProgress;
+  };
+  if (!response.ok || !json.success || !json.progress) {
+    return null;
+  }
+  return json.progress;
+}
+
+async function completeQuestOnServer(params: {
+  wallet: string;
+  questId: QuestId;
+}): Promise<QuestProgress | null> {
+  const response = await fetch("/api/quests/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(params),
+  });
+  const json = (await response.json()) as {
+    success?: boolean;
+    progress?: QuestProgress;
+  };
+  if (!response.ok || !json.success || !json.progress) {
+    return null;
+  }
+  return json.progress;
+}
+
 export function useQuestEngine() {
   const [progress, setProgress] = useState<QuestProgress>(getDefaultProgress);
   const [questDefinitions, setQuestDefinitions] =
@@ -58,6 +100,8 @@ export function useQuestEngine() {
   const [progressReady, setProgressReady] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
   const { address, status: walletStatus } = useAccount();
+  const { ensureWalletAuth } = useWalletAuth();
+  const { canReceiveGenesisXPBonus } = useGenesisAccess();
   const isWalletConnected = walletStatus === "connected";
   const isWalletReconnecting =
     walletStatus === "connecting" || walletStatus === "reconnecting";
@@ -76,7 +120,6 @@ export function useQuestEngine() {
       return;
     }
 
-    // Authenticated users load from Supabase in syncUserProgress.
     if (isWalletConnected && storageWalletAddress) {
       return;
     }
@@ -125,26 +168,35 @@ export function useQuestEngine() {
 
     async function syncUserProgress() {
       try {
-        const user = await fetchOrCreateUser(walletAddress);
-        if (cancelled || !user) {
-          return;
-        }
-
-        const next = normalizeStreak(userRowToProgress(user));
-
+        const auth = await ensureWalletAuth();
         if (cancelled) {
           return;
         }
 
-        setProgress(next);
-        setProgressReady(true);
-
-        try {
-          await saveUserProgress(walletAddress, next);
-        } catch {
-          // Supabase unavailable; local cache below is offline fallback only.
+        if (!auth.ok) {
+          const fallback = normalizeStreak(loadProgress(storageWalletAddress));
+          setProgress(fallback);
+          setProgressReady(true);
+          cacheProgressLocally(fallback, storageWalletAddress);
+          return;
         }
 
+        const serverProgress = await syncProgressFromServer(walletAddress);
+        if (cancelled) {
+          return;
+        }
+
+        if (!serverProgress) {
+          const fallback = normalizeStreak(loadProgress(storageWalletAddress));
+          setProgress(fallback);
+          setProgressReady(true);
+          cacheProgressLocally(fallback, storageWalletAddress);
+          return;
+        }
+
+        const next = normalizeStreak(serverProgress);
+        setProgress(next);
+        setProgressReady(true);
         cacheProgressLocally(next, storageWalletAddress);
         maybeCompleteReferral(walletAddress, next);
       } catch (error) {
@@ -170,70 +222,84 @@ export function useQuestEngine() {
     address,
     isWalletConnected,
     storageWalletAddress,
+    ensureWalletAuth,
   ]);
 
-  const updateProgress = useCallback(
-    (updater: (current: QuestProgress) => QuestProgress) => {
-      setProgress((current) => {
-        const next = normalizeStreak(updater(current));
-
-        if (address && isWalletConnected) {
-          void saveUserProgress(address, next)
-            .then(() => {
-              cacheProgressLocally(next, storageWalletAddress);
-              maybeCompleteReferral(address, next);
-            })
-            .catch(() => {
-              cacheProgressLocally(next, storageWalletAddress);
-              maybeCompleteReferral(address, next);
-            });
-        } else {
-          cacheProgressLocally(next, storageWalletAddress);
-        }
-
-        return next;
-      });
+  const applyLocalProgress = useCallback(
+    (nextProgress: QuestProgress) => {
+      const next = normalizeStreak(nextProgress);
+      setProgress(next);
+      cacheProgressLocally(next, storageWalletAddress);
+      maybeCompleteReferral(address, next);
     },
-    [address, isWalletConnected, storageWalletAddress],
-  );
-
-  const handleQuestAction = useCallback(
-    (questId: QuestId) => {
-      updateProgress((current) => {
-        const previousLevel = getLevel(current.totalXp);
-        const next = performQuestAction(
-          current,
-          questId,
-          undefined,
-          questDefinitions,
-        );
-        const newLevel = getLevel(next.totalXp);
-
-        if (newLevel > previousLevel) {
-          setLevelUpLevel(newLevel);
-        }
-
-        return next;
-      });
-    },
-    [updateProgress, questDefinitions],
+    [address, storageWalletAddress],
   );
 
   const applyServerProgress = useCallback(
     (nextProgress: QuestProgress) => {
-      updateProgress((current) => {
-        const previousLevel = getLevel(current.totalXp);
-        const next = normalizeStreak(nextProgress);
-        const newLevel = getLevel(next.totalXp);
+      const previousLevel = getLevel(progress.totalXp);
+      const next = normalizeStreak(nextProgress);
+      const newLevel = getLevel(next.totalXp);
 
-        if (newLevel > previousLevel) {
-          setLevelUpLevel(newLevel);
-        }
+      if (newLevel > previousLevel) {
+        setLevelUpLevel(newLevel);
+      }
 
-        return next;
-      });
+      applyLocalProgress(next);
     },
-    [updateProgress],
+    [applyLocalProgress, progress.totalXp],
+  );
+
+  const handleQuestAction = useCallback(
+    (questId: QuestId) => {
+      const previousLevel = getLevel(progress.totalXp);
+      const definition = questDefinitions.find((item) => item.id === questId);
+      const baseXP = definition?.rewardXp ?? 0;
+      const { totalXP: rewardXpOverride } = calculateGenesisXP(baseXP, {
+        canReceiveGenesisXPBonus,
+      });
+
+      // Optimistic local update for responsiveness; server is authoritative.
+      const optimistic = performQuestAction(
+        progress,
+        questId,
+        undefined,
+        questDefinitions,
+        definition ? { rewardXpOverride } : undefined,
+      );
+      const optimisticLevel = getLevel(optimistic.totalXp);
+      if (optimisticLevel > previousLevel) {
+        setLevelUpLevel(optimisticLevel);
+      }
+      applyLocalProgress(optimistic);
+
+      if (!address || !isWalletConnected || !SERVER_OWNED_QUESTS.has(questId)) {
+        return;
+      }
+
+      void (async () => {
+        const auth = await ensureWalletAuth();
+        if (!auth.ok) {
+          return;
+        }
+        const serverProgress = await completeQuestOnServer({
+          wallet: address,
+          questId,
+        });
+        if (serverProgress) {
+          applyLocalProgress(serverProgress);
+        }
+      })();
+    },
+    [
+      address,
+      applyLocalProgress,
+      canReceiveGenesisXPBonus,
+      ensureWalletAuth,
+      isWalletConnected,
+      progress,
+      questDefinitions,
+    ],
   );
 
   const quests = useMemo(

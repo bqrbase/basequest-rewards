@@ -1,5 +1,4 @@
 import {
-  getDefaultProgress,
   normalizeCheckInDate,
   parseQuestIds,
   type QuestId,
@@ -26,9 +25,8 @@ import { logSupabaseError } from "@/lib/supabase/errors";
  *   updated_at timestamptz not null default now()
  * );
  *
- * alter table users add column if not exists twitter_user_id text;
- * alter table users add column if not exists x_username text;
- * alter table users add column if not exists x_follow_verified_at timestamptz;
+ * SECURITY: anon clients may SELECT only (RLS). All XP writes go through
+ * service-role helpers in lib/supabase/usersServer.ts after wallet ownership.
  */
 export type UserRow = {
   id: string;
@@ -65,7 +63,11 @@ export function progressToUserUpdate(progress: QuestProgress) {
   };
 }
 
-export async function fetchOrCreateUser(
+/**
+ * Read-only fetch. Does not create rows (RLS blocks anon insert).
+ * Prefer POST /api/progress/sync after wallet ownership for authoritative state.
+ */
+export async function fetchUser(
   walletAddress: string,
 ): Promise<UserRow | null> {
   const normalizedAddress = normalizeWalletAddress(walletAddress);
@@ -73,7 +75,7 @@ export async function fetchOrCreateUser(
   const supabase = getSupabaseClient();
   if (!supabase) {
     logSupabaseError(
-      "fetchOrCreateUser",
+      "fetchUser",
       "client unavailable",
       new Error("Supabase client is not configured"),
       { walletAddress: normalizedAddress },
@@ -88,65 +90,47 @@ export async function fetchOrCreateUser(
     .maybeSingle();
 
   if (fetchError) {
-    logSupabaseError("fetchOrCreateUser", "select", fetchError, {
+    logSupabaseError("fetchUser", "select", fetchError, {
       walletAddress: normalizedAddress,
     });
     throw fetchError;
   }
 
-  if (existingUser) {
-    return existingUser as UserRow;
-  }
-
-  const defaultProgress = getDefaultProgress();
-  const { data: createdUser, error: createError } = await supabase
-    .from("users")
-    .insert({
-      wallet_address: normalizedAddress,
-      total_xp: defaultProgress.totalXp,
-      streak: defaultProgress.streak,
-      last_checkin: defaultProgress.lastCheckInDate,
-      completed_quests: defaultProgress.completedQuestIds,
-    })
-    .select("*")
-    .single();
-
-  if (createError) {
-    logSupabaseError("fetchOrCreateUser", "insert", createError, {
-      walletAddress: normalizedAddress,
-    });
-    throw createError;
-  }
-
-  return createdUser as UserRow;
+  return (existingUser as UserRow | null) ?? null;
 }
 
-export async function saveUserProgress(
+/**
+ * @deprecated Client create/write path removed for security.
+ * Server routes must use fetchOrCreateUserAdmin from usersServer.
+ * Kept name for gradual migration — read-only wrapper.
+ */
+export async function fetchOrCreateUser(
   walletAddress: string,
-  progress: QuestProgress,
+): Promise<UserRow | null> {
+  if (typeof window !== "undefined") {
+    return fetchUser(walletAddress);
+  }
+
+  // Server callers should migrate to usersServer; temporary bridge.
+  const { fetchOrCreateUserAdmin } = await import(
+    "@/lib/supabase/usersServer"
+  );
+  return fetchOrCreateUserAdmin(walletAddress);
+}
+
+/**
+ * @deprecated Client XP writes are forbidden.
+ * Use awardOneTimeQuest / saveUserProgressAdmin on the server after ownership checks.
+ */
+export async function saveUserProgress(
+  _walletAddress: string,
+  _progress: QuestProgress,
 ): Promise<void> {
-  const normalizedAddress = normalizeWalletAddress(walletAddress);
-
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    const configError = new Error("Supabase is not configured");
-    logSupabaseError("saveUserProgress", "client unavailable", configError, {
-      walletAddress: normalizedAddress,
-    });
-    throw configError;
-  }
-
-  const { error } = await supabase
-    .from("users")
-    .update(progressToUserUpdate(progress))
-    .eq("wallet_address", normalizedAddress);
-
-  if (error) {
-    logSupabaseError("saveUserProgress", "update", error, {
-      walletAddress: normalizedAddress,
-    });
-    throw error;
-  }
+  const error = new Error(
+    "Client XP writes are disabled. Persist progress via authenticated server APIs.",
+  );
+  logSupabaseError("saveUserProgress", "client_write_blocked", error, {});
+  throw error;
 }
 
 export async function linkXAccountToWallet(
@@ -154,17 +138,15 @@ export async function linkXAccountToWallet(
   account: { xUserId: string; xUsername: string },
 ): Promise<void> {
   const normalizedAddress = normalizeWalletAddress(walletAddress);
+  const { fetchOrCreateUserAdmin } = await import(
+    "@/lib/supabase/usersServer"
+  );
 
-  // Ensure the user row exists before linking.
-  await fetchOrCreateUser(normalizedAddress);
+  await fetchOrCreateUserAdmin(normalizedAddress);
 
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseAdminClient();
   if (!supabase) {
-    const configError = new Error("Supabase is not configured");
-    logSupabaseError("linkXAccountToWallet", "client unavailable", configError, {
-      walletAddress: normalizedAddress,
-    });
-    throw configError;
+    throw new Error("Supabase is not configured");
   }
 
   const { error } = await supabase
@@ -186,8 +168,7 @@ export async function linkXAccountToWallet(
 }
 
 /**
- * Persist verified X follow (@bqrbase) for a wallet.
- * Stores twitter_user_id + verification timestamp.
+ * Persist verified X follow (@bqrbase) for a wallet (server-only).
  */
 export async function saveXFollowVerification(
   walletAddress: string,
@@ -198,9 +179,12 @@ export async function saveXFollowVerification(
   },
 ): Promise<void> {
   const normalizedAddress = normalizeWalletAddress(walletAddress);
-  await fetchOrCreateUser(normalizedAddress);
+  const { fetchOrCreateUserAdmin } = await import(
+    "@/lib/supabase/usersServer"
+  );
+  await fetchOrCreateUserAdmin(normalizedAddress);
 
-  const supabase = getSupabaseAdminClient() ?? getSupabaseClient();
+  const supabase = getSupabaseAdminClient();
   if (!supabase) {
     const configError = new Error("Supabase is not configured");
     logSupabaseError(

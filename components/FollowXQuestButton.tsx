@@ -127,6 +127,7 @@ export default function FollowXQuestButton({
       const response = await fetch("/api/auth/x/verify-follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ wallet: address }),
       });
 

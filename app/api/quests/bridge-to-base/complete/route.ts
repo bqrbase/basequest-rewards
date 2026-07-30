@@ -3,6 +3,7 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { LIFI_BASE_CHAIN_ID } from "@/lib/swap/lifi";
 import { verifyBaseDestinationTx } from "@/lib/swap/verifyBaseDestinationTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
@@ -82,6 +83,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const walletAddress = normalizeWalletAddress(wallet);
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
+    }
+
     const verification = await verifyBaseDestinationTx({
       txHash: destinationTxHash,
     });
@@ -97,11 +104,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const walletAddress = normalizeWalletAddress(wallet);
-    const { progress, alreadyCompleted } = await awardOneTimeQuest({
-      walletAddress,
-      questId: "bridge-to-base",
-    });
+    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
+      await awardOneTimeQuest({
+        walletAddress,
+        questId: "bridge-to-base",
+      });
 
     return NextResponse.json({
       success: true,
@@ -109,6 +116,9 @@ export async function POST(request: Request) {
       destinationTxHash: verification.txHash.toLowerCase(),
       destinationChainId: verification.chainId,
       sourceTxHash: body.sourceTxHash?.toLowerCase() ?? null,
+      baseXP,
+      bonusXP,
+      awardedXP,
       progress: progressResponse(progress),
     });
   } catch (error) {

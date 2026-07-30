@@ -108,6 +108,7 @@ export default function FollowFarcasterQuestButton({
       const response = await fetch("/api/auth/farcaster/verify-follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           wallet: address,
           ...(fid ? { fid } : {}),

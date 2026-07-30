@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import {
   extractSupabaseError,
   saveDeployedContract,
 } from "@/lib/supabase/deployedContracts";
+import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -28,9 +30,8 @@ const BASE_MAINNET_CHAIN_ID = 8453;
 
 /**
  * POST /api/contracts/save
- * Persists a deployed contract address using the service-role admin client.
- * Bypasses RLS — never uses the browser anon client.
- * Base Mainnet (8453) only.
+ * Persists a deployed contract using the service-role admin client.
+ * Requires wallet ownership (+ tx from wallet when txHash provided).
  */
 export async function POST(request: Request) {
   try {
@@ -91,6 +92,27 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
+    }
+
+    if (txHash) {
+      const verification = await verifyBaseSwapTx({
+        txHash,
+        walletAddress,
+      });
+      if (!verification.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: verification.error,
+            message: verification.message,
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     const row = await saveDeployedContract({
       walletAddress,

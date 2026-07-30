@@ -141,6 +141,7 @@ export default function DeployContractModal({
       const saveResponse = await fetch("/api/contracts/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           wallet: address,
           contractAddress: result.contractAddress,
@@ -195,6 +196,7 @@ export default function DeployContractModal({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             wallet: address,
             contractAddress: result.contractAddress,

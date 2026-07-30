@@ -1,9 +1,8 @@
 /**
  * Genesis holder system foundation.
  *
- * Phase 1: ownership detection, badge UI, and disabled exclusive quest previews.
- * Future phases can activate XP bonus, claimable quests, and airdrops
- * without changing the core quest/XP engines.
+ * Ownership detection, access control, exclusive quest previews, and
+ * server-persisted Genesis XP bonus (+20%) when canReceiveGenesisXPBonus.
  */
 
 export {
@@ -45,6 +44,7 @@ export type {
 } from "@/lib/genesis/access";
 export {
   calculateGenesisXP,
+  awardGenesisAdjustedXp,
   GENESIS_XP_BONUS_RATE,
   parseRewardXpLabel,
 } from "@/lib/genesis/xp";

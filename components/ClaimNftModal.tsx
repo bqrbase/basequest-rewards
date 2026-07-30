@@ -120,6 +120,7 @@ export default function ClaimNftModal({
       const saveResponse = await fetch("/api/nfts/claim/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           wallet: address,
           contractAddress: result.contractAddress,
@@ -172,6 +173,7 @@ export default function ClaimNftModal({
       const completeResponse = await fetch("/api/quests/claim-nft/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           wallet: address,
           contractAddress: result.contractAddress,

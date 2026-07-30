@@ -11,7 +11,7 @@ export type QuestId =
   | "first-swap"
   | "bridge-to-base";
 
-const QUEST_IDS: QuestId[] = [
+export const QUEST_IDS: QuestId[] = [
   "daily-check-in",
   "view-leaderboard",
   "build-streak",
@@ -236,7 +236,7 @@ function resolveQuestDefinitions(
   return QUEST_DEFINITIONS;
 }
 
-function findQuestDefinition(
+export function findQuestDefinition(
   questId: QuestId,
   definitions?: QuestDefinition[],
 ): QuestDefinition | undefined {
@@ -447,6 +447,7 @@ export function performDailyCheckIn(
   progress: QuestProgress,
   today = getTodayDateString(),
   definitions?: QuestDefinition[],
+  options?: { rewardXpOverride?: number },
 ): QuestProgress {
   const lastCheckInDate = normalizeCheckInDate(progress.lastCheckInDate);
 
@@ -456,8 +457,12 @@ export function performDailyCheckIn(
       : { ...progress, lastCheckInDate: today };
   }
 
-  const rewardXp =
+  const catalogXp =
     findQuestDefinition("daily-check-in", definitions)?.rewardXp ?? 10;
+  const rewardXp =
+    options?.rewardXpOverride !== undefined
+      ? options.rewardXpOverride
+      : catalogXp;
   const yesterday = getPreviousDateString(today);
   const nextStreak =
     lastCheckInDate === yesterday ? progress.streak + 1 : 1;
@@ -478,6 +483,7 @@ export function completeOneTimeQuest(
   progress: QuestProgress,
   questId: QuestId,
   definitions?: QuestDefinition[],
+  options?: { rewardXpOverride?: number },
 ): QuestProgress {
   const definition = findQuestDefinition(questId, definitions);
   if (!definition || questId === "daily-check-in") {
@@ -492,9 +498,14 @@ export function completeOneTimeQuest(
     return progress;
   }
 
+  const rewardXp =
+    options?.rewardXpOverride !== undefined
+      ? options.rewardXpOverride
+      : definition.rewardXp;
+
   return {
     ...progress,
-    totalXp: progress.totalXp + definition.rewardXp,
+    totalXp: progress.totalXp + rewardXp,
     completedQuestIds: [...progress.completedQuestIds, questId],
   };
 }
@@ -504,12 +515,13 @@ export function performQuestAction(
   questId: QuestId,
   today = getTodayDateString(),
   definitions?: QuestDefinition[],
+  options?: { rewardXpOverride?: number },
 ): QuestProgress {
   if (questId === "daily-check-in") {
-    return performDailyCheckIn(progress, today, definitions);
+    return performDailyCheckIn(progress, today, definitions, options);
   }
 
-  return completeOneTimeQuest(progress, questId, definitions);
+  return completeOneTimeQuest(progress, questId, definitions, options);
 }
 
 export function getCompletedQuestCount(progress: QuestProgress): number {

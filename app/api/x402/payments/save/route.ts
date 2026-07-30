@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import {
   extractSupabaseError,
   saveX402Payment,
@@ -59,6 +60,10 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
+    }
 
     const row = await saveX402Payment({
       walletAddress,

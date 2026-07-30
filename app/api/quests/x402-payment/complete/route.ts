@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
 import {
-  completeOneTimeQuest,
-  QUEST_DEFINITIONS,
-  type QuestProgress,
-} from "@/lib/quest-engine";
+  awardOneTimeQuest,
+  progressResponse,
+} from "@/lib/quests/awardOneTimeQuest";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
-import {
-  fetchOrCreateUser,
-  saveUserProgress,
-  userRowToProgress,
-} from "@/lib/supabase/users";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -22,8 +17,7 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/x402-payment/complete
- * Completes the x402-payment quest and awards XP.
- * Payment persistence is handled by POST /api/x402/payments/save.
+ * Requires wallet ownership session. Payment row: POST /api/x402/payments/save.
  */
 export async function POST(request: Request) {
   try {
@@ -48,46 +42,25 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-
-    const user = await fetchOrCreateUser(walletAddress);
-    let progress: QuestProgress = user
-      ? userRowToProgress(user)
-      : {
-          totalXp: 0,
-          streak: 0,
-          lastCheckInDate: null,
-          completedQuestIds: [],
-        };
-
-    const alreadyCompleted = progress.completedQuestIds.includes("x402-payment");
-
-    if (!alreadyCompleted) {
-      progress = completeOneTimeQuest(
-        progress,
-        "x402-payment",
-        QUEST_DEFINITIONS,
-      );
-
-      try {
-        await saveUserProgress(walletAddress, progress);
-      } catch (progressError) {
-        console.error(
-          "[x402-payment/complete] saveUserProgress",
-          progressError,
-        );
-      }
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
     }
+
+    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
+      await awardOneTimeQuest({
+        walletAddress,
+        questId: "x402-payment",
+      });
 
     return NextResponse.json({
       success: true,
       alreadyCompleted,
       txHash: txHash?.toLowerCase() ?? null,
-      progress: {
-        totalXp: progress.totalXp,
-        streak: progress.streak,
-        lastCheckInDate: progress.lastCheckInDate,
-        completedQuestIds: progress.completedQuestIds,
-      },
+      baseXP,
+      bonusXP,
+      awardedXP,
+      progress: progressResponse(progress),
     });
   } catch (error) {
     const info = extractSupabaseError(error);

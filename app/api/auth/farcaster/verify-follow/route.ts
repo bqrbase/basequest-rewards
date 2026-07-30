@@ -5,15 +5,10 @@ import {
   lookupFidByWalletAddress,
 } from "@/lib/farcaster/neynar";
 import {
-  completeOneTimeQuest,
-  QUEST_DEFINITIONS,
-  type QuestProgress,
-} from "@/lib/quest-engine";
-import {
-  fetchOrCreateUser,
-  saveUserProgress,
-  userRowToProgress,
-} from "@/lib/supabase/users";
+  awardOneTimeQuest,
+  progressResponse,
+} from "@/lib/quests/awardOneTimeQuest";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -27,9 +22,7 @@ type VerifyBody = {
 
 /**
  * POST /api/auth/farcaster/verify-follow
- * Body: { wallet: "0x...", fid?: number }
- *
- * Uses Neynar viewer_context to check whether the user follows @hqc (FID 368591).
+ * Requires wallet ownership. Prefers FID resolved from the wallet when possible.
  */
 export async function POST(request: Request) {
   try {
@@ -52,16 +45,19 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
+    }
+
     const bodyFid =
       typeof body.fid === "number" && Number.isFinite(body.fid) && body.fid > 0
         ? Math.floor(body.fid)
         : null;
 
-    let viewerFid = bodyFid;
-
-    if (!viewerFid) {
-      viewerFid = await lookupFidByWalletAddress(walletAddress);
-    }
+    // Prefer wallet→FID lookup so clients cannot spoof an arbitrary FID.
+    const linkedFid = await lookupFidByWalletAddress(walletAddress);
+    const viewerFid = linkedFid ?? bodyFid;
 
     if (!viewerFid) {
       return NextResponse.json(
@@ -69,6 +65,16 @@ export async function POST(request: Request) {
           success: false,
           error:
             "Could not read your Farcaster FID. Open BaseQuest in Farcaster/Base App, or use a wallet linked to Farcaster.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (linkedFid && bodyFid && linkedFid !== bodyFid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Farcaster FID does not match the connected wallet.",
         },
         { status: 400 },
       );
@@ -87,43 +93,20 @@ export async function POST(request: Request) {
       });
     }
 
-    const user = await fetchOrCreateUser(walletAddress);
-    let progress: QuestProgress = user
-      ? userRowToProgress(user)
-      : {
-          totalXp: 0,
-          streak: 0,
-          lastCheckInDate: null,
-          completedQuestIds: [],
-        };
-
-    const alreadyCompleted =
-      progress.completedQuestIds.includes("follow-farcaster");
-
-    if (!alreadyCompleted) {
-      progress = completeOneTimeQuest(
-        progress,
-        "follow-farcaster",
-        QUEST_DEFINITIONS,
-      );
-
-      try {
-        await saveUserProgress(walletAddress, progress);
-      } catch (saveError) {
-        console.error("[farcaster/verify-follow] saveUserProgress", saveError);
-      }
-    }
+    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
+      await awardOneTimeQuest({
+        walletAddress,
+        questId: "follow-farcaster",
+      });
 
     return NextResponse.json({
       success: true,
       alreadyCompleted,
       fid: viewerFid,
-      progress: {
-        totalXp: progress.totalXp,
-        streak: progress.streak,
-        lastCheckInDate: progress.lastCheckInDate,
-        completedQuestIds: progress.completedQuestIds,
-      },
+      baseXP,
+      bonusXP,
+      awardedXP,
+      progress: progressResponse(progress),
     });
   } catch (error) {
     console.error("[farcaster/verify-follow] failed", error);

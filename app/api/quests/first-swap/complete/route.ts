@@ -3,6 +3,7 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
+import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
@@ -17,7 +18,7 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/first-swap/complete
- * Completes the first-swap quest only after a confirmed successful Base tx.
+ * Requires wallet ownership + confirmed Base tx from that wallet.
  */
 export async function POST(request: Request) {
   try {
@@ -49,6 +50,10 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
+    const ownership = await enforceWalletOwnership(walletAddress);
+    if (!ownership.ok) {
+      return ownership.response;
+    }
 
     const verification = await verifyBaseSwapTx({
       txHash,
@@ -66,15 +71,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const { progress, alreadyCompleted } = await awardOneTimeQuest({
-      walletAddress,
-      questId: "first-swap",
-    });
+    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
+      await awardOneTimeQuest({
+        walletAddress,
+        questId: "first-swap",
+      });
 
     return NextResponse.json({
       success: true,
       alreadyCompleted,
       txHash: verification.txHash.toLowerCase(),
+      baseXP,
+      bonusXP,
+      awardedXP,
       progress: progressResponse(progress),
     });
   } catch (error) {
