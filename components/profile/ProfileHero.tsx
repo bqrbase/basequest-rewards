@@ -1,5 +1,6 @@
 "use client";
 
+import GenesisBadge from "@/components/genesis/GenesisBadge";
 import ProfileAvatar from "@/components/profile/ProfileAvatar";
 import GlassPanel from "@/components/GlassPanel";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
@@ -7,6 +8,7 @@ import ScoreRing from "@/components/ui/ScoreRing";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
 import Link from "next/link";
 import { useState } from "react";
+import type { Address } from "viem";
 
 type ProfileHeroProps = {
   address: string;
@@ -65,6 +67,7 @@ export default function ProfileHero({
           )}
 
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+            <GenesisBadge address={address as Address} />
             <p
               className="truncate font-mono text-sm tracking-wide text-white/60"
               title={address}

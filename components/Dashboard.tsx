@@ -21,6 +21,7 @@ import BqrBalanceCard from "@/components/dashboard/BqrBalanceCard";
 import DashboardLeaderboardPreview from "@/components/dashboard/DashboardLeaderboardPreview";
 import DashboardRecentActivity from "@/components/dashboard/DashboardRecentActivity";
 import GenesisCollectionCard from "@/components/dashboard/GenesisCollectionCard";
+import GenesisQuestsSection from "@/components/genesis/GenesisQuestsSection";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
 import ScoreRing from "@/components/ui/ScoreRing";
 import { useQuestEngine } from "@/hooks/useQuestEngine";
@@ -422,6 +423,8 @@ export default function Dashboard() {
               ))}
             </div>
           </section>
+
+          <GenesisQuestsSection />
         </>
       )}
     </PageShell>

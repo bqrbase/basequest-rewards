@@ -7,6 +7,7 @@ import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
+import GenesisQuestsSection from "@/components/genesis/GenesisQuestsSection";
 import PageShell from "@/components/PageShell";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import QuestCard from "@/components/QuestCard";
@@ -120,6 +121,8 @@ export default function QuestsPage() {
           </div>
         )}
       </section>
+
+      <GenesisQuestsSection />
     </PageShell>
   );
 }
