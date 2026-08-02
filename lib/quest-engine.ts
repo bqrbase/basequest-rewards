@@ -6,6 +6,7 @@ export type QuestId =
   | "follow-x"
   | "follow-farcaster"
   | "deploy-contract"
+  | "mint-genesis"
   | "claim-nft"
   | "x402-payment"
   | "first-swap"
@@ -19,6 +20,7 @@ export const QUEST_IDS: QuestId[] = [
   "follow-x",
   "follow-farcaster",
   "deploy-contract",
+  "mint-genesis",
   "claim-nft",
   "x402-payment",
   "first-swap",
@@ -34,6 +36,7 @@ export const COMMUNITY_ENGINE_QUEST_IDS: QuestId[] = [
 /** Builder quests rendered by dedicated UI (excluded from generic builder map). */
 export const SPECIAL_BUILDER_QUEST_IDS: QuestId[] = [
   "deploy-contract",
+  "mint-genesis",
   "claim-nft",
   "x402-payment",
   "first-swap",
@@ -118,6 +121,10 @@ const QUEST_ENGINE_METADATA: Record<
     prerequisites: [],
     ctaAvailable: "Deploy Contract",
   },
+  "mint-genesis": {
+    prerequisites: [],
+    ctaAvailable: "Mint Genesis",
+  },
   "claim-nft": {
     prerequisites: ["deploy-contract"],
     ctaAvailable: "Claim NFT",
@@ -191,6 +198,13 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
       "Choose a contract template and deploy your first contract on Base.",
     rewardXp: 50,
     ...QUEST_ENGINE_METADATA["deploy-contract"],
+  },
+  {
+    id: "mint-genesis",
+    title: "Mint Genesis NFT",
+    description: "Mint your BaseQuest Genesis NFT.",
+    rewardXp: 100,
+    ...QUEST_ENGINE_METADATA["mint-genesis"],
   },
   {
     id: "claim-nft",

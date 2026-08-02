@@ -1,22 +1,18 @@
 "use client";
 
-import CommunityQuestCards, {
-  filterBuilderQuests,
-} from "@/components/CommunityQuestCards";
+import CommunityQuestCards from "@/components/CommunityQuestCards";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import GlassPanel from "@/components/GlassPanel";
+import MintGenesisQuestCard from "@/components/MintGenesisQuestCard";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import LevelProgressBar from "@/components/LevelProgressBar";
 import LevelUpCelebration from "@/components/LevelUpCelebration";
 import PageShell from "@/components/PageShell";
 import QuestCard from "@/components/QuestCard";
-import WalletStatusCard from "@/components/WalletStatusCard";
 import BqrBalanceCard from "@/components/dashboard/BqrBalanceCard";
-import DashboardLeaderboardPreview from "@/components/dashboard/DashboardLeaderboardPreview";
-import DashboardRecentActivity from "@/components/dashboard/DashboardRecentActivity";
 import GenesisCollectionCard from "@/components/dashboard/GenesisCollectionCard";
 import GenesisBonusActiveBadge from "@/components/genesis/GenesisBonusActiveBadge";
 import GenesisQuestsSection from "@/components/genesis/GenesisQuestsSection";
@@ -26,13 +22,26 @@ import { useQuestEngine } from "@/hooks/useQuestEngine";
 import { getLevel, getProgressPercent } from "@/lib/levels";
 import type { QuestId } from "@/lib/quest-engine";
 import { ui } from "@/lib/ui-styles";
-import Link from "next/link";
 import { Suspense } from "react";
-import { useRouter } from "next/navigation";
 
 function DashboardSkeleton() {
   return (
     <>
+      <section className={ui.dashSection}>
+        <div className={ui.gridCards}>
+          {Array.from({ length: 4 }, (_, index) => (
+            <div
+              key={index}
+              className={`${ui.glassCard} min-h-[10rem] animate-pulse ${ui.dashCardPad}`}
+            >
+              <div className="h-3 w-28 rounded bg-white/10" />
+              <div className="mt-4 h-12 rounded bg-white/10" />
+              <div className="mt-auto h-10 w-full rounded bg-white/10 pt-6" />
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className={`${ui.dashSection} ${ui.gridStats}`}>
         {Array.from({ length: 4 }, (_, index) => (
           <div
@@ -41,18 +50,6 @@ function DashboardSkeleton() {
           >
             <div className="h-3 w-24 rounded bg-white/10" />
             <div className="mt-auto h-8 w-16 rounded bg-white/10 pt-6" />
-          </div>
-        ))}
-      </section>
-
-      <section className={`${ui.dashSection} ${ui.dashPairGrid}`}>
-        {Array.from({ length: 2 }, (_, index) => (
-          <div
-            key={index}
-            className={`${ui.glassCard} min-h-[10rem] animate-pulse ${ui.dashCardPad}`}
-          >
-            <div className="h-3 w-24 rounded bg-white/10" />
-            <div className="mt-4 h-16 rounded bg-white/10" />
           </div>
         ))}
       </section>
@@ -70,7 +67,6 @@ function parseStatNumber(value: string): number | null {
 }
 
 export default function Dashboard() {
-  const router = useRouter();
   const {
     hydrated,
     quests,
@@ -85,6 +81,10 @@ export default function Dashboard() {
   const level = getLevel(totalXp);
   const levelProgress = getProgressPercent(totalXp);
 
+  // Dashboard-only fixed onboarding order; completed quests stay in place.
+  const dailyCheckInQuest = quests.find((quest) => quest.id === "daily-check-in");
+  const exploreBaseQuest = quests.find((quest) => quest.id === "explore-base");
+
   return (
     <PageShell>
       {!hydrated ? (
@@ -98,7 +98,92 @@ export default function Dashboard() {
             />
           ) : null}
 
-          {/* Progress + XP */}
+          {/* Onboarding quests — always first, fixed order, never reordered */}
+          <section className={ui.dashSection}>
+            <div className={ui.sectionHeaderWrap}>
+              <p className={ui.sectionHeading}>Start here</p>
+              <h2 className={ui.sectionTitle}>Onboarding Quests</h2>
+              <p className={ui.sectionDescription}>
+                Complete these core quests to earn XP and get started on Base.
+              </p>
+            </div>
+
+            <div className={ui.gridCards}>
+              {dailyCheckInQuest ? (
+                <QuestCard
+                  questId={dailyCheckInQuest.id}
+                  title={dailyCheckInQuest.title}
+                  description={dailyCheckInQuest.description}
+                  reward={dailyCheckInQuest.reward}
+                  status={dailyCheckInQuest.status}
+                  ctaLabel={dailyCheckInQuest.ctaLabel}
+                  onAction={() =>
+                    handleQuestAction(dailyCheckInQuest.id as QuestId)
+                  }
+                />
+              ) : null}
+              <DeployContractQuestCard
+                quest={quests.find((quest) => quest.id === "deploy-contract")}
+                onCompleted={applyServerProgress}
+              />
+              <MintGenesisQuestCard
+                quest={quests.find((quest) => quest.id === "mint-genesis")}
+                onCompleted={applyServerProgress}
+              />
+              <X402PaymentQuestCard
+                quest={quests.find((quest) => quest.id === "x402-payment")}
+                onCompleted={applyServerProgress}
+              />
+              <FirstSwapQuestCard
+                quest={quests.find((quest) => quest.id === "first-swap")}
+              />
+              <BridgeToBaseQuestCard
+                quest={quests.find((quest) => quest.id === "bridge-to-base")}
+              />
+              <ClaimNftQuestCard
+                quest={quests.find((quest) => quest.id === "claim-nft")}
+                onCompleted={applyServerProgress}
+              />
+              {exploreBaseQuest ? (
+                <QuestCard
+                  questId={exploreBaseQuest.id}
+                  title={exploreBaseQuest.title}
+                  description={exploreBaseQuest.description}
+                  reward={exploreBaseQuest.reward}
+                  status={exploreBaseQuest.status}
+                  ctaLabel={exploreBaseQuest.ctaLabel}
+                  onAction={() =>
+                    handleQuestAction(exploreBaseQuest.id as QuestId)
+                  }
+                />
+              ) : null}
+            </div>
+          </section>
+
+          {/* Community Quests */}
+          <section className={ui.dashSection}>
+            <div className={ui.sectionHeaderWrap}>
+              <p className={ui.sectionHeading}>Community</p>
+              <h2 className={ui.sectionTitle}>Community Quests</h2>
+              <p className={ui.sectionDescription}>
+                Follow BaseQuest Rewards on social and stay connected with the
+                community.
+              </p>
+            </div>
+            <div className={ui.gridCards}>
+              <Suspense fallback={null}>
+                <CommunityQuestCards
+                  quests={quests}
+                  onFollowXCompleted={applyServerProgress}
+                />
+              </Suspense>
+            </div>
+          </section>
+
+          {/* Genesis Exclusive Quests */}
+          <GenesisQuestsSection />
+
+          {/* Your Progress */}
           <section className={ui.dashSection}>
             <div className={ui.sectionHeaderWrap}>
               <p className={ui.sectionHeading}>Overview</p>
@@ -180,69 +265,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* Wallet + Score */}
-          <section className={`${ui.dashSection} ${ui.dashPairGrid}`}>
-            <div className={ui.dashPairCell}>
-              <div className={ui.dashPairHeader}>
-                <p className={ui.sectionHeading}>Wallet</p>
-                <h2 className={ui.sectionTitle}>Wallet Status</h2>
-              </div>
-              <div className={ui.dashPairBody}>
-                <WalletStatusCard />
-              </div>
-            </div>
-
-            <div className={ui.dashPairCell}>
-              <div className={ui.dashPairHeader}>
-                <p className={ui.sectionHeading}>Analytics</p>
-                <h2 className={ui.sectionTitle}>Base Wallet Score</h2>
-              </div>
-              <div className={ui.dashPairBody}>
-                <Link href="/base-wallet-score" className="flex h-full min-h-0 flex-col">
-                  <GlassPanel
-                    interactive
-                    className={`h-full ${ui.dashCardPad}`}
-                  >
-                    <div className="flex h-full flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-5">
-                      <ScoreRing
-                        value={levelProgress}
-                        size={120}
-                        strokeWidth={10}
-                        label="Open Base Wallet Score analytics"
-                        center={
-                          <>
-                            <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-white/45">
-                              Score
-                            </span>
-                            <span className="mt-0.5 font-sans text-sm font-bold text-white">
-                              Open
-                            </span>
-                          </>
-                        }
-                      />
-                      <div className="flex min-w-0 flex-1 flex-col text-center sm:text-left">
-                        <p className={ui.statLabel}>BaseQuest 2.0</p>
-                        <p className="mt-1 font-sans text-xl font-bold tracking-tight text-white">
-                          Base Wallet Score
-                        </p>
-                        <p className="mt-2 text-sm leading-relaxed text-white/55">
-                          Premium Base analytics — score, portfolio, activity,
-                          and insights.
-                        </p>
-                        <span
-                          className={`mt-auto inline-flex pt-4 ${ui.secondaryButton}`}
-                        >
-                          View Score
-                        </span>
-                      </div>
-                    </div>
-                  </GlassPanel>
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          {/* BQR Balance + Genesis Collection */}
+          {/* Token + Genesis Collection */}
           <section className={`${ui.dashSection} grid grid-cols-1 items-stretch gap-6 md:grid-cols-2`}>
             <div className={ui.dashPairCell}>
               <div className={ui.dashPairHeader}>
@@ -264,100 +287,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* Leaderboard + Activity */}
-          <section className={`${ui.dashSection} ${ui.dashPairGrid}`}>
-            <div className={ui.dashPairCell}>
-              <div className={ui.dashPairHeader}>
-                <p className={ui.sectionHeading}>Community</p>
-                <h2 className={ui.sectionTitle}>Leaderboard</h2>
-              </div>
-              <div className={ui.dashPairBody}>
-                <DashboardLeaderboardPreview />
-              </div>
-            </div>
-            <div className={ui.dashPairCell}>
-              <div className={ui.dashPairHeader}>
-                <p className={ui.sectionHeading}>History</p>
-                <h2 className={ui.sectionTitle}>Recent Activity</h2>
-              </div>
-              <div className={ui.dashPairBody}>
-                <DashboardRecentActivity quests={quests} />
-              </div>
-            </div>
-          </section>
-
-          {/* Community quests */}
-          <section className={ui.dashSection}>
-            <div className={ui.sectionHeaderWrap}>
-              <p className={ui.sectionHeading}>Community</p>
-              <h2 className={ui.sectionTitle}>Community Quests</h2>
-              <p className={ui.sectionDescription}>
-                Follow BaseQuest Rewards on social and stay connected with the
-                community.
-              </p>
-            </div>
-            <div className={ui.gridCards}>
-              <Suspense fallback={null}>
-                <CommunityQuestCards
-                  quests={quests}
-                  onFollowXCompleted={applyServerProgress}
-                />
-              </Suspense>
-            </div>
-          </section>
-
-          {/* Builder quests */}
-          <section className={ui.dashSection}>
-            <div className={ui.sectionHeaderWrap}>
-              <p className={ui.sectionHeading}>Builder</p>
-              <h2 className={ui.sectionTitle}>Builder Quests</h2>
-              <p className={ui.sectionDescription}>
-                Complete builder quests to earn XP and grow your streak.
-              </p>
-            </div>
-
-            <div className={ui.gridCards}>
-              <DeployContractQuestCard
-                quest={quests.find((quest) => quest.id === "deploy-contract")}
-                onCompleted={applyServerProgress}
-              />
-              <ClaimNftQuestCard
-                quest={quests.find((quest) => quest.id === "claim-nft")}
-                onCompleted={applyServerProgress}
-              />
-              <X402PaymentQuestCard
-                quest={quests.find((quest) => quest.id === "x402-payment")}
-                onCompleted={applyServerProgress}
-              />
-              <FirstSwapQuestCard
-                quest={quests.find((quest) => quest.id === "first-swap")}
-              />
-              <BridgeToBaseQuestCard
-                quest={quests.find((quest) => quest.id === "bridge-to-base")}
-              />
-              {filterBuilderQuests(quests).map((quest) => (
-                <QuestCard
-                  key={quest.id}
-                  questId={quest.id}
-                  title={quest.title}
-                  description={quest.description}
-                  reward={quest.reward}
-                  status={quest.status}
-                  ctaLabel={quest.ctaLabel}
-                  onAction={() => {
-                    if (quest.id === "view-leaderboard") {
-                      router.push("/leaderboard");
-                      return;
-                    }
-
-                    handleQuestAction(quest.id as QuestId);
-                  }}
-                />
-              ))}
-            </div>
-          </section>
-
-          <GenesisQuestsSection />
+          {/* Community Footer rendered by PageShell */}
         </>
       )}
     </PageShell>
