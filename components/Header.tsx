@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAccount, useDisconnect } from "wagmi";
+import { useWalletDisconnect } from "@/hooks/useWalletDisconnect";
+import { useAccount } from "wagmi";
 
 /** Always visible in the mobile top bar */
 const MOBILE_PRIMARY_NAV = [
@@ -103,7 +104,7 @@ function menuItemClassName(isActive: boolean) {
 
 function WalletMenu({ pathname }: { pathname: string }) {
   const { address } = useAccount();
-  const { disconnect, isPending: isDisconnecting } = useDisconnect();
+  const { disconnect, isPending: isDisconnecting } = useWalletDisconnect();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{

@@ -252,7 +252,8 @@ export function useQuestEngine() {
 
   const handleQuestAction = useCallback(
     (questId: QuestId) => {
-      const previousLevel = getLevel(progress.totalXp);
+      const previous = progress;
+      const previousLevel = getLevel(previous.totalXp);
       const definition = questDefinitions.find((item) => item.id === questId);
       const baseXP = definition?.rewardXp ?? 0;
       const { totalXP: rewardXpOverride } = calculateGenesisXP(baseXP, {
@@ -261,35 +262,55 @@ export function useQuestEngine() {
 
       // Optimistic local update for responsiveness; server is authoritative.
       const optimistic = performQuestAction(
-        progress,
+        previous,
         questId,
         undefined,
         questDefinitions,
         definition ? { rewardXpOverride } : undefined,
       );
+      applyLocalProgress(optimistic);
+
+      const rollbackOptimistic = () => {
+        applyLocalProgress(previous);
+      };
+
+      // Server-owned quests must match DB — never keep optimistic XP on failure.
+      if (SERVER_OWNED_QUESTS.has(questId)) {
+        if (!address || !isWalletConnected) {
+          rollbackOptimistic();
+          return;
+        }
+
+        void (async () => {
+          const auth = await ensureWalletAuth();
+          if (!auth.ok) {
+            rollbackOptimistic();
+            return;
+          }
+
+          const serverProgress = await completeQuestOnServer({
+            wallet: address,
+            questId,
+          });
+
+          if (!serverProgress) {
+            rollbackOptimistic();
+            return;
+          }
+
+          const newLevel = getLevel(serverProgress.totalXp);
+          if (newLevel > previousLevel) {
+            setLevelUpLevel(newLevel);
+          }
+          applyLocalProgress(serverProgress);
+        })();
+        return;
+      }
+
       const optimisticLevel = getLevel(optimistic.totalXp);
       if (optimisticLevel > previousLevel) {
         setLevelUpLevel(optimisticLevel);
       }
-      applyLocalProgress(optimistic);
-
-      if (!address || !isWalletConnected || !SERVER_OWNED_QUESTS.has(questId)) {
-        return;
-      }
-
-      void (async () => {
-        const auth = await ensureWalletAuth();
-        if (!auth.ok) {
-          return;
-        }
-        const serverProgress = await completeQuestOnServer({
-          wallet: address,
-          questId,
-        });
-        if (serverProgress) {
-          applyLocalProgress(serverProgress);
-        }
-      })();
     },
     [
       address,

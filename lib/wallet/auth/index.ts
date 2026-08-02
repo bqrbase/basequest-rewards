@@ -5,13 +5,17 @@
 
 export { buildWalletAuthMessage } from "@/lib/wallet/auth/message";
 export {
+  WALLET_AUTH_CHALLENGE_COOKIE,
+  WALLET_AUTH_PUBLIC_COOKIE,
+  WALLET_AUTH_SESSION_COOKIE,
+} from "@/lib/wallet/auth/constants";
+export {
   clearWalletAuthCookies,
   createChallengeNonce,
   readWalletAuthPublicCookie,
   readWalletAuthSessionCookie,
   setWalletAuthChallengeCookie,
   setWalletAuthSessionCookie,
-  WALLET_AUTH_PUBLIC_COOKIE,
   type WalletAuthChallenge,
   type WalletAuthPublic,
   type WalletAuthSession,

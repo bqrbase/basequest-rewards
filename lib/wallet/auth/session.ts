@@ -1,5 +1,10 @@
 import { cookies } from "next/headers";
 import {
+  WALLET_AUTH_CHALLENGE_COOKIE,
+  WALLET_AUTH_PUBLIC_COOKIE,
+  WALLET_AUTH_SESSION_COOKIE,
+} from "@/lib/wallet/auth/constants";
+import {
   createWalletAuthNonce,
   getWalletAuthSecret,
   signWalletAuthPayload,
@@ -7,9 +12,11 @@ import {
 } from "@/lib/wallet/auth/secret";
 import { normalizeWalletAddress } from "@/lib/x/config";
 
-export const WALLET_AUTH_SESSION_COOKIE = "bq_wallet_session";
-export const WALLET_AUTH_PUBLIC_COOKIE = "bq_wallet_auth_public";
-export const WALLET_AUTH_CHALLENGE_COOKIE = "bq_wallet_challenge";
+export {
+  WALLET_AUTH_CHALLENGE_COOKIE,
+  WALLET_AUTH_PUBLIC_COOKIE,
+  WALLET_AUTH_SESSION_COOKIE,
+};
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24; // 24 hours
 const CHALLENGE_MAX_AGE_SECONDS = 60 * 10; // 10 minutes

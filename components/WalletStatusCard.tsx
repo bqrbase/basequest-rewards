@@ -3,7 +3,8 @@
 import ConnectWalletButton from "@/components/ConnectWalletButton";
 import GlassPanel from "@/components/GlassPanel";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
-import { useAccount, useDisconnect } from "wagmi";
+import { useWalletDisconnect } from "@/hooks/useWalletDisconnect";
+import { useAccount } from "wagmi";
 
 type WalletStatusCardProps = {
   className?: string;
@@ -13,7 +14,7 @@ export default function WalletStatusCard({
   className = "",
 }: WalletStatusCardProps) {
   const { address, status } = useAccount();
-  const { disconnect, isPending: isDisconnecting } = useDisconnect();
+  const { disconnect, isPending: isDisconnecting } = useWalletDisconnect();
 
   const isConnected = status === "connected";
 
