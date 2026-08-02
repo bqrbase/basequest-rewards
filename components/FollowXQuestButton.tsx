@@ -1,6 +1,7 @@
 "use client";
 
 import { XIcon } from "@/components/icons/SocialIcons";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { ui } from "@/lib/ui-styles";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
 import { useCallback, useEffect, useState } from "react";
@@ -30,6 +31,7 @@ export default function FollowXQuestButton({
   onCompleted,
 }: FollowXQuestButtonProps) {
   const { address, status: walletStatus } = useAccount();
+  const { ensureWalletAuth } = useWalletAuth();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -124,6 +126,16 @@ export default function FollowXQuestButton({
     setErrorMessage(null);
 
     try {
+      const auth = await ensureWalletAuth();
+      if (!auth.ok) {
+        setErrorMessage(
+          auth.error === "wallet_not_connected"
+            ? "Connect your wallet before verifying."
+            : "Sign the wallet ownership message to continue.",
+        );
+        return;
+      }
+
       const response = await fetch("/api/auth/x/verify-follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -9,6 +9,7 @@ import {
   getBaseScanNftUrl,
 } from "@/lib/contracts/claim/baseQuestBadge";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
 import {
@@ -50,6 +51,7 @@ export default function ClaimNftModal({
   const chainId = useChainId();
   const { address, status: walletStatus } = useAccount();
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
+  const { ensureWalletAuth } = useWalletAuth();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
   const badgeAddress = getBaseQuestBadgeAddress();
 
@@ -103,6 +105,16 @@ export default function ClaimNftModal({
     setErrorMessage(null);
 
     try {
+      const auth = await ensureWalletAuth();
+      if (!auth.ok) {
+        setErrorMessage(
+          auth.error === "wallet_not_connected"
+            ? "Connect your wallet to claim."
+            : "Sign the wallet ownership message to continue.",
+        );
+        return;
+      }
+
       const claimChainId = await ensureBaseMainnetReady();
 
       const result = await claimBaseQuestBadge({

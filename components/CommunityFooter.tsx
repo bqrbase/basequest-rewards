@@ -1,7 +1,16 @@
 import GlassPanel from "@/components/GlassPanel";
 import { ui } from "@/lib/ui-styles";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiFarcaster, SiX } from "react-icons/si";
+
+const FOOTER_LINKS = [
+  { href: "/about", label: "About" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/privacy", label: "Privacy Policy" },
+  { href: "/terms", label: "Terms of Service" },
+  { href: "/contact", label: "Contact" },
+] as const;
 
 const X_URL = "https://x.com/bqrbase";
 const FARCASTER_FOLLOW_URL = "https://farcaster.xyz/hqc";
@@ -95,6 +104,21 @@ export default function CommunityFooter() {
               </a>
             ))}
           </div>
+
+          <nav
+            aria-label="Legal and information"
+            className="mt-5 flex w-full max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-white/10 pt-4 sm:mt-6 sm:gap-x-5"
+          >
+            {FOOTER_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-xs font-medium text-white/45 transition-colors hover:text-cyan-100/90 sm:text-sm"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </GlassPanel>
     </section>

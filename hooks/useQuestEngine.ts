@@ -18,6 +18,7 @@ import { getLevel } from "@/lib/levels";
 import { completeReferralClient } from "@/lib/referrals/client";
 import { REFERRAL_ONBOARDING_QUEST_ID } from "@/lib/referrals/constants";
 import { fetchQuests } from "@/lib/supabase/quests";
+import { fetchUser, userRowToProgress } from "@/lib/supabase/users";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { calculateGenesisXP } from "@/lib/genesis/xp";
 import { useGenesisAccess } from "@/hooks/useGenesisAccess";
@@ -100,7 +101,7 @@ export function useQuestEngine() {
   const [progressReady, setProgressReady] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
   const { address, status: walletStatus } = useAccount();
-  const { ensureWalletAuth } = useWalletAuth();
+  const { ensureWalletAuth, hasWalletAuthSession } = useWalletAuth();
   const { canReceiveGenesisXPBonus } = useGenesisAccess();
   const isWalletConnected = walletStatus === "connected";
   const isWalletReconnecting =
@@ -166,41 +167,54 @@ export function useQuestEngine() {
     const walletAddress = address;
     let cancelled = false;
 
-    async function syncUserProgress() {
+    /**
+     * Soft hydrate on connect — never prompts for a signature.
+     * Uses an existing session if present; otherwise public read / local cache.
+     */
+    async function hydrateProgressWithoutAuth() {
       try {
-        const auth = await ensureWalletAuth();
+        const hasSession = await hasWalletAuthSession();
         if (cancelled) {
           return;
         }
 
-        if (!auth.ok) {
-          const fallback = normalizeStreak(loadProgress(storageWalletAddress));
-          setProgress(fallback);
-          setProgressReady(true);
-          cacheProgressLocally(fallback, storageWalletAddress);
-          return;
+        if (hasSession) {
+          const serverProgress = await syncProgressFromServer(walletAddress);
+          if (cancelled) {
+            return;
+          }
+          if (serverProgress) {
+            const next = normalizeStreak(serverProgress);
+            setProgress(next);
+            setProgressReady(true);
+            cacheProgressLocally(next, storageWalletAddress);
+            maybeCompleteReferral(walletAddress, next);
+            return;
+          }
         }
 
-        const serverProgress = await syncProgressFromServer(walletAddress);
+        const user = await fetchUser(walletAddress);
         if (cancelled) {
           return;
         }
 
-        if (!serverProgress) {
-          const fallback = normalizeStreak(loadProgress(storageWalletAddress));
-          setProgress(fallback);
+        if (user) {
+          const next = normalizeStreak(userRowToProgress(user));
+          setProgress(next);
           setProgressReady(true);
-          cacheProgressLocally(fallback, storageWalletAddress);
+          cacheProgressLocally(next, storageWalletAddress);
           return;
         }
 
-        const next = normalizeStreak(serverProgress);
-        setProgress(next);
+        const fallback = normalizeStreak(loadProgress(storageWalletAddress));
+        setProgress(fallback);
         setProgressReady(true);
-        cacheProgressLocally(next, storageWalletAddress);
-        maybeCompleteReferral(walletAddress, next);
+        cacheProgressLocally(fallback, storageWalletAddress);
       } catch (error) {
-        console.error("[useQuestEngine] syncUserProgress failed", error);
+        console.error(
+          "[useQuestEngine] hydrateProgressWithoutAuth failed",
+          error,
+        );
         if (cancelled) {
           return;
         }
@@ -212,7 +226,7 @@ export function useQuestEngine() {
       }
     }
 
-    void syncUserProgress();
+    void hydrateProgressWithoutAuth();
 
     return () => {
       cancelled = true;
@@ -222,7 +236,7 @@ export function useQuestEngine() {
     address,
     isWalletConnected,
     storageWalletAddress,
-    ensureWalletAuth,
+    hasWalletAuthSession,
   ]);
 
   const applyLocalProgress = useCallback(

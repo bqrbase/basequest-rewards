@@ -7,6 +7,7 @@ import {
   getBaseScanAddressUrl,
 } from "@/lib/contracts/deploy/helloBase";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
 import { formatWalletAddress, ui } from "@/lib/ui-styles";
 import {
@@ -78,6 +79,7 @@ export default function DeployContractModal({
   const config = useConfig();
   const { address, status: walletStatus } = useAccount();
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
+  const { ensureWalletAuth } = useWalletAuth();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
 
   const [step, setStep] = useState<ModalStep>("templates");
@@ -125,6 +127,16 @@ export default function DeployContractModal({
     setErrorMessage(null);
 
     try {
+      const auth = await ensureWalletAuth();
+      if (!auth.ok) {
+        setErrorMessage(
+          auth.error === "wallet_not_connected"
+            ? "Connect your wallet to deploy."
+            : "Sign the wallet ownership message to continue.",
+        );
+        return;
+      }
+
       const deployChainId = await ensureBaseMainnetReady();
 
       const result = await deployHelloBase({
