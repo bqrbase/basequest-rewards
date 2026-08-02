@@ -1,7 +1,6 @@
 "use client";
 
 import { useWalletScoreData } from "@/hooks/useWalletScoreData";
-import type { AiInsight } from "@/lib/wallet-score/mock-data";
 import type { ScoreCategoryId } from "@/lib/wallet-score/scoring/types";
 import { getScoreImprovementSuggestions } from "@/lib/wallet-score/scoring";
 import { formatWalletAddress } from "@/lib/ui-styles";
@@ -356,16 +355,6 @@ function ActivityChart({
   );
 }
 
-function insightImpactClass(impact: AiInsight["impact"]) {
-  if (impact === "score+") {
-    return "border-violet-300/30 bg-gradient-to-br from-violet-500/20 via-[#17133a]/70 to-[#0f1a3d]/80";
-  }
-  if (impact === "risk") {
-    return "border-amber-400/35 bg-gradient-to-br from-amber-500/15 via-[#17133a]/70 to-[#0f1a3d]/80";
-  }
-  return "border-white/12 bg-gradient-to-br from-white/[0.06] via-[#17133a]/65 to-[#0f1a3d]/75";
-}
-
 function sourceBadge(source: "live" | "mock" | "unavailable") {
   if (source === "live") {
     return (
@@ -387,67 +376,6 @@ function sourceBadge(source: "live" | "mock" | "unavailable") {
     <span className="rounded-badge border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[0.5rem] font-semibold uppercase tracking-widest text-white/40">
       Mock
     </span>
-  );
-}
-
-const SNAPSHOT_TONES = {
-  strength: {
-    card: "border-emerald-400/30 bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent",
-    icon: "border-emerald-300/40 bg-emerald-400/20 text-emerald-200",
-    label: "text-emerald-200/80",
-    glow: "bg-emerald-400/20",
-  },
-  weakness: {
-    card: "border-rose-400/30 bg-gradient-to-r from-rose-500/20 via-amber-500/10 to-transparent",
-    icon: "border-rose-300/40 bg-rose-400/20 text-rose-200",
-    label: "text-rose-200/80",
-    glow: "bg-rose-400/20",
-  },
-  improve: {
-    card: "border-sky-400/30 bg-gradient-to-r from-base-blue/25 via-cyan-500/12 to-transparent",
-    icon: "border-sky-300/40 bg-sky-400/20 text-sky-100",
-    label: "text-sky-200/80",
-    glow: "bg-base-blue/25",
-  },
-} as const;
-
-function QuickInsightIcon({ id }: { id: keyof typeof SNAPSHOT_TONES }) {
-  const common = "size-5";
-  if (id === "strength") {
-    return (
-      <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M13 3L4 14h7l-1 7 10-12h-7l0-6z"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-  if (id === "weakness") {
-    return (
-      <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-  return (
-    <svg className={common} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M4 19V5m0 14h16M8 15V9m4 6V7m4 8v-4"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
@@ -855,8 +783,7 @@ function sectionFallbackMessage(
 
 export default function WalletScoreDashboard() {
   const view = useWalletScoreData();
-  const { hero, stats, live, analytics, score, ecosystem, intelligence } =
-    view;
+  const { hero, stats, live, analytics, score, ecosystem } = view;
   const improvementSuggestions = getScoreImprovementSuggestions(
     score.breakdown,
     score.maxScore,
@@ -869,7 +796,7 @@ export default function WalletScoreDashboard() {
     stats.find((stat) => stat.id === id)?.value ?? "—";
 
   return (
-    <div className="flex flex-col gap-16 sm:gap-20 lg:gap-24">
+    <div className="flex flex-col gap-10 sm:gap-12 lg:gap-14">
       <style>{`
         @keyframes bq-fade-up {
           from {
@@ -1011,84 +938,8 @@ export default function WalletScoreDashboard() {
         </section>
       </Reveal>
 
-      {/* Quick Insights — hierarchy bridge under Hero */}
-      <Reveal delayMs={60}>
-        <section>
-          <SectionHeading
-            eyebrow="Snapshot"
-            title="Quick Insights"
-            badge={sourceBadge(sectionSource)}
-          />
-          <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
-            {(() => {
-              const kind = resolveSectionKind({
-                isConnected: live.isConnected,
-                isLoading: live.isLoading,
-                hasData: analytics.snapshotInsights.length > 0,
-                health: analytics.health,
-              });
-              if (kind === "loading") {
-                return (
-                  <div className="lg:col-span-3">
-                    <SectionSkeleton rows={2} />
-                  </div>
-                );
-              }
-              if (kind !== "data") {
-                return (
-                  <div className="lg:col-span-3">
-                    <FallbackCard
-                      title="Snapshot"
-                      message={sectionFallbackMessage(
-                        kind,
-                        "No snapshot insights yet for this wallet.",
-                        analytics.statusMessage,
-                      )}
-                    />
-                  </div>
-                );
-              }
-              return analytics.snapshotInsights.map((insight) => {
-                const tone = SNAPSHOT_TONES[insight.id];
-                return (
-                  <article
-                    key={insight.id}
-                    className={`group relative flex min-h-[7.5rem] overflow-hidden rounded-2xl border p-4 shadow-[0_12px_32px_rgba(0,0,0,0.24)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 sm:min-h-[8rem] sm:p-5 ${tone.card}`}
-                  >
-                    <div
-                      aria-hidden
-                      className={`pointer-events-none absolute -right-6 -top-6 size-24 rounded-full blur-2xl ${tone.glow}`}
-                    />
-                    <div className="relative z-10 flex w-full gap-3.5 sm:gap-4">
-                      <div
-                        className={`flex size-10 shrink-0 items-center justify-center rounded-xl border sm:size-11 ${tone.icon}`}
-                      >
-                        <QuickInsightIcon id={insight.id} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`text-[0.55rem] font-semibold uppercase tracking-[0.16em] ${tone.label}`}
-                        >
-                          {insight.label}
-                        </p>
-                        <h3 className="mt-1.5 font-sans text-base font-bold leading-snug tracking-tight text-white sm:text-lg">
-                          {insight.headline}
-                        </h3>
-                        <p className="mt-1.5 text-xs leading-relaxed text-white/60 sm:text-[0.8rem]">
-                          {insight.detail}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                );
-              });
-            })()}
-          </div>
-        </section>
-      </Reveal>
-
       {/* Score Breakdown — engine category points */}
-      <Reveal delayMs={80}>
+      <Reveal delayMs={60}>
         <section>
           <SectionHeading
             eyebrow="Model"
@@ -1363,174 +1214,6 @@ export default function WalletScoreDashboard() {
         </section>
       </Reveal>
 
-      {/* 5. Assets */}
-      <Reveal delayMs={200}>
-        <section>
-          <SectionHeading
-            eyebrow="Holdings"
-            title="Assets"
-            badge={sourceBadge(sectionSource)}
-          />
-          <article className={`${panelClassName("primary")} overflow-hidden p-2 sm:p-3`}>
-            <PanelGlow />
-            <div className="relative z-10">
-              {(() => {
-                const kind = resolveSectionKind({
-                  isConnected: live.isConnected,
-                  isLoading: live.isLoading,
-                  hasData: analytics.assetsTable.length > 0,
-                  health: analytics.health,
-                  sectionError: analytics.sectionErrors.assets,
-                });
-                if (kind === "loading") {
-                  return <SectionSkeleton rows={4} />;
-                }
-                if (kind !== "data") {
-                  return (
-                    <FallbackCard
-                      title="Holdings"
-                      message={sectionFallbackMessage(
-                        kind,
-                        "No token holdings found on Base for this wallet.",
-                        analytics.sectionErrors.assets ||
-                          analytics.statusMessage,
-                      )}
-                    />
-                  );
-                }
-                return (
-                  <>
-                    <div className="hidden grid-cols-[minmax(0,1.4fr)_1fr_1fr_5.5rem] gap-3 px-3 py-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-white/45 sm:grid sm:px-4">
-                      <span>Asset</span>
-                      <span className="text-right">Balance</span>
-                      <span className="text-right">Value</span>
-                      <span className="text-right">24h</span>
-                    </div>
-                    <div className="space-y-1.5 sm:space-y-2">
-                      {analytics.assetsTable.map((asset) => (
-                        <div
-                          key={asset.id}
-                          className="grid grid-cols-1 gap-2 rounded-card border border-white/10 bg-white/[0.04] px-3 py-3 transition-all duration-300 hover:-translate-y-px hover:border-white/18 hover:bg-white/[0.07] sm:grid-cols-[minmax(0,1.4fr)_1fr_1fr_5.5rem] sm:items-center sm:gap-3 sm:px-4 sm:py-3.5"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-sans text-sm font-semibold text-white">
-                              {asset.symbol}
-                            </p>
-                            <p className="truncate text-xs text-white/45">
-                              {asset.name}
-                            </p>
-                          </div>
-                          <p className="font-mono text-sm tabular-nums text-white/70 sm:text-right">
-                            <span className="mr-2 text-[0.55rem] uppercase tracking-widest text-white/40 sm:hidden">
-                              Balance
-                            </span>
-                            {asset.balance}
-                          </p>
-                          <p className="font-sans text-sm font-semibold tabular-nums text-white sm:text-right">
-                            <span className="mr-2 text-[0.55rem] uppercase tracking-widest text-white/40 sm:hidden">
-                              Value
-                            </span>
-                            {asset.valueUsd}
-                          </p>
-                          <p
-                            className={`text-sm font-semibold tabular-nums sm:text-right ${
-                              asset.changePositive
-                                ? "text-emerald-300"
-                                : "text-rose-300"
-                            }`}
-                          >
-                            {asset.change24h}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </article>
-      </section>
-      </Reveal>
-
-      {/* 6. Recent Activity */}
-      <Reveal delayMs={240}>
-      <section>
-        <SectionHeading
-          eyebrow="Timeline"
-          title="Recent Activity"
-          badge={sourceBadge(sectionSource)}
-        />
-        <article className={`${panelClassName("secondary")} p-4 sm:p-5`}>
-          <PanelGlow />
-          {(() => {
-            const kind = resolveSectionKind({
-              isConnected: live.isConnected,
-              isLoading: live.isLoading,
-              hasData: analytics.recentActivity.length > 0,
-              health: analytics.health,
-              sectionError: analytics.sectionErrors.timeline,
-            });
-            if (kind === "loading") {
-              return (
-                <div className="relative z-10">
-                  <SectionSkeleton rows={4} />
-                </div>
-              );
-            }
-            if (kind !== "data") {
-              return (
-                <div className="relative z-10">
-                  <FallbackCard
-                    title="Timeline"
-                    message={sectionFallbackMessage(
-                      kind,
-                      "No recent Base transactions to show yet.",
-                      analytics.sectionErrors.timeline ||
-                        analytics.statusMessage,
-                    )}
-                  />
-                </div>
-              );
-            }
-            return (
-              <ul className="relative z-10 space-y-2 sm:space-y-2.5">
-                {analytics.recentActivity.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex flex-col gap-2 rounded-card border border-white/10 bg-white/[0.04] px-3 py-3 transition-all duration-300 hover:-translate-y-px hover:border-violet-300/25 hover:bg-white/[0.07] sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-3.5"
-                  >
-                    <span className="shrink-0 rounded-badge border border-violet-300/35 bg-gradient-to-r from-violet-500/20 to-base-blue/15 px-2.5 py-1 text-[0.6rem] font-semibold uppercase tracking-widest text-violet-100">
-                      {item.type}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-white">
-                        {item.description}
-                      </p>
-                      <p className="mt-0.5 text-xs text-white/45">{item.time}</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end sm:justify-center">
-                      <p className="font-mono text-sm tabular-nums text-white/70">
-                        {item.amount}
-                      </p>
-                      <span
-                        className={`rounded-badge border px-2 py-0.5 text-[0.55rem] font-semibold uppercase tracking-widest ${
-                          item.status === "success"
-                            ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
-                            : "border-amber-400/40 bg-amber-500/15 text-amber-200"
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            );
-          })()}
-        </article>
-      </section>
-      </Reveal>
-
       {/* 8. Achievements */}
       <Reveal delayMs={320}>
       <section>
@@ -1566,215 +1249,6 @@ export default function WalletScoreDashboard() {
             </article>
           ))}
         </div>
-      </section>
-      </Reveal>
-
-      {/* Wallet Intelligence — deterministic rules from score engine */}
-      <Reveal delayMs={340}>
-        <section>
-          <SectionHeading
-            eyebrow="Intelligence"
-            title="Wallet Intelligence"
-            badge={sourceBadge(sectionSource)}
-            description="Personality, reputation, and risk derived from your Wallet Score metrics — no AI APIs."
-          />
-          <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
-            <article
-              className={`${panelClassName("primary")} flex flex-col p-5 sm:p-6`}
-            >
-              <PanelGlow />
-              <div className="relative z-10 flex flex-1 flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-cyan-200/60">
-                    Personality
-                  </p>
-                  <span className="shrink-0 rounded-badge border border-cyan-300/35 bg-cyan-500/15 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-cyan-100">
-                    {intelligence.personality.label}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl">
-                  {intelligence.personality.label}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  {intelligence.personality.summary}
-                </p>
-                <ul className="mt-4 space-y-1.5 border-t border-white/[0.08] pt-3">
-                  {intelligence.personality.signals.map((signal) => (
-                    <li
-                      key={signal.label}
-                      className="flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className="text-white/45">{signal.label}</span>
-                      <span className="font-mono tabular-nums text-white/80">
-                        {signal.value}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-
-            <article
-              className={`${panelClassName("primary")} flex flex-col p-5 sm:p-6`}
-            >
-              <PanelGlow />
-              <div className="relative z-10 flex flex-1 flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-indigo-200/60">
-                    Reputation
-                  </p>
-                  <span className="shrink-0 rounded-badge border border-indigo-300/35 bg-indigo-500/15 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-indigo-100">
-                    {intelligence.reputation.label}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl">
-                  {intelligence.reputation.label}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  {intelligence.reputation.summary}
-                </p>
-                <p className="mt-3 text-[0.65rem] uppercase tracking-[0.14em] text-white/40">
-                  Band {intelligence.reputation.scoreBand}
-                </p>
-                <ul className="mt-3 space-y-1.5 border-t border-white/[0.08] pt-3">
-                  {intelligence.reputation.signals.map((signal) => (
-                    <li
-                      key={signal.label}
-                      className="flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className="text-white/45">{signal.label}</span>
-                      <span className="font-mono tabular-nums text-white/80">
-                        {signal.value}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-
-            <article
-              className={`${panelClassName("primary")} flex flex-col p-5 sm:p-6`}
-            >
-              <PanelGlow />
-              <div className="relative z-10 flex flex-1 flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/50">
-                    Risk Level
-                  </p>
-                  <span
-                    className={`shrink-0 rounded-badge border px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest ${
-                      intelligence.risk.id === "low"
-                        ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-100"
-                        : intelligence.risk.id === "medium"
-                          ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
-                          : "border-rose-400/40 bg-rose-500/15 text-rose-100"
-                    }`}
-                  >
-                    {intelligence.risk.label}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl">
-                  {intelligence.risk.label} Risk
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  {intelligence.risk.summary}
-                </p>
-                <p className="mt-3 font-mono text-sm tabular-nums text-white/70">
-                  Pressure{" "}
-                  <span className="font-semibold text-white">
-                    {intelligence.risk.riskScore}
-                  </span>
-                  <span className="text-white/40"> / 100</span>
-                </p>
-                <ul className="mt-3 space-y-1.5 border-t border-white/[0.08] pt-3">
-                  {intelligence.risk.signals.map((signal) => (
-                    <li
-                      key={signal.label}
-                      className="flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className="text-white/45">{signal.label}</span>
-                      <span className="font-mono tabular-nums text-white/80">
-                        {signal.value}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-          </div>
-        </section>
-      </Reveal>
-
-      {/* 9. AI Insights */}
-      <Reveal delayMs={360}>
-      <section>
-        <SectionHeading
-          eyebrow="Intelligence"
-          title="AI Insights"
-          badge={sourceBadge(sectionSource)}
-          description="Rule-based summaries grounded in this wallet's live onchain footprint — illustrative only, not financial advice."
-        />
-        {(() => {
-          const kind = resolveSectionKind({
-            isConnected: live.isConnected,
-            isLoading: live.isLoading,
-            hasData: analytics.aiInsights.length > 0,
-            health: analytics.health,
-            sectionError: analytics.sectionErrors.insights,
-          });
-          if (kind === "loading") {
-            return <SectionSkeleton rows={3} />;
-          }
-          if (kind !== "data") {
-            return (
-              <FallbackCard
-                title="Insights"
-                message={sectionFallbackMessage(
-                  kind,
-                  "Insights will appear once live on-chain analytics are available.",
-                  analytics.sectionErrors.insights || analytics.statusMessage,
-                )}
-              />
-            );
-          }
-          return (
-            <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
-              {analytics.aiInsights.map((insight) => (
-                <article
-                  key={insight.id}
-                  className={`relative overflow-hidden rounded-card border p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300/30 hover:shadow-[0_20px_48px_rgba(0,0,0,0.32),0_0_28px_rgba(124,58,237,0.12)] sm:p-6 ${insightImpactClass(insight.impact)}`}
-                >
-                  <PanelGlow />
-                  <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-violet-100/75">
-                      {insight.category}
-                    </p>
-                    <span className="rounded-badge border border-violet-300/30 bg-violet-500/15 px-2 py-0.5 text-[0.55rem] font-semibold uppercase tracking-widest text-violet-100">
-                      {insight.confidence}% confidence
-                    </span>
-                  </div>
-                  <h3 className="relative z-10 mt-3 font-sans text-base font-bold text-white sm:text-lg">
-                    {insight.title}
-                  </h3>
-                  <p className="relative z-10 mt-2 text-sm leading-relaxed text-white/55">
-                    {insight.body}
-                  </p>
-                  <p className="relative z-10 mt-3 text-xs leading-relaxed text-white/45">
-                    {insight.evidence}
-                  </p>
-                  <div className="relative z-10 mt-4 rounded-card border border-white/12 bg-black/20 px-3 py-2.5">
-                    <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/45">
-                      Recommendation
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-white/85">
-                      {insight.recommendation}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          );
-        })()}
       </section>
       </Reveal>
 

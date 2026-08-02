@@ -28,6 +28,13 @@ export const BASEQUEST_GENESIS_ABI = [
   },
   {
     type: "function",
+    name: "exists",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256", internalType: "uint256" }],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+  },
+  {
+    type: "function",
     name: "MAX_SUPPLY",
     stateMutability: "view",
     inputs: [],

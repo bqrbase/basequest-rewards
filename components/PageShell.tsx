@@ -1,3 +1,4 @@
+import CommunityFooter from "@/components/CommunityFooter";
 import Header from "@/components/Header";
 import { ui } from "@/lib/ui-styles";
 
@@ -28,7 +29,10 @@ export default function PageShell({ children }: PageShellProps) {
 
       <Header />
 
-      <main className={ui.pageMain}>{children}</main>
+      <main className={ui.pageMain}>
+        {children}
+        <CommunityFooter />
+      </main>
     </div>
   );
 }

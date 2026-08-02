@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 
 type BridgeToBaseQuestCardProps = {
   quest?: QuestViewModel;
-  /** When true, scroll to the in-page Bridge section instead of navigating. */
-  scrollToBridge?: boolean;
 };
 
 /**
@@ -15,7 +13,6 @@ type BridgeToBaseQuestCardProps = {
  */
 export default function BridgeToBaseQuestCard({
   quest,
-  scrollToBridge = false,
 }: BridgeToBaseQuestCardProps) {
   const router = useRouter();
   const status: QuestStatus = quest?.status ?? "available";
@@ -45,14 +42,7 @@ export default function BridgeToBaseQuestCard({
           return;
         }
 
-        if (scrollToBridge) {
-          document
-            .getElementById("bridge-to-base")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-          return;
-        }
-
-        router.push("/#bridge-to-base");
+        router.push("/bridge");
       }}
     />
   );

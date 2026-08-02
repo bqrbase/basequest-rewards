@@ -1,57 +1,38 @@
 "use client";
 
 import ConnectWalletButton from "@/components/ConnectWalletButton";
+import { useWalletDisconnect } from "@/hooks/useWalletDisconnect";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useWalletDisconnect } from "@/hooks/useWalletDisconnect";
 import { useAccount } from "wagmi";
 
-/** Always visible in the mobile top bar */
-const MOBILE_PRIMARY_NAV = [
-  { href: "/", label: "Dashboard" },
-  { href: "/quests", label: "Quests" },
-  { href: "/genesis", label: "Genesis" },
-  { href: "/rewards", label: "Rewards" },
-] as const;
+type NavItem = {
+  href: string;
+  label: string;
+};
 
-/** Mobile wallet dropdown — exact order */
-const MOBILE_WALLET_MENU = [
-  { href: "/profile", label: "Profile" },
-  { href: "/achievements", label: "Achievements" },
-  { href: "/referral", label: "Referral" },
-  { href: "/rewards", label: "Rewards" },
-  { href: "/token", label: "Token" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/base-wallet-score", label: "Wallet Score" },
-  { href: "/settings", label: "Settings" },
-] as const;
-
-/** Desktop wallet dropdown */
-const DESKTOP_WALLET_MENU = [
-  { href: "/profile", label: "Profile" },
-  { href: "/achievements", label: "Achievements" },
-  { href: "/referral", label: "Referral" },
-  { href: "/rewards", label: "Rewards" },
-  { href: "/token", label: "Token" },
-  { href: "/settings", label: "Settings" },
-] as const;
-
-/** Full desktop nav */
-const DESKTOP_NAV = [
+/** Full app navigation — same order on desktop and mobile. */
+const MAIN_NAV: readonly NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
   { href: "/achievements", label: "Achievements" },
   { href: "/referral", label: "Referral" },
   { href: "/rewards", label: "Rewards" },
+  { href: "/swap", label: "Swap" },
+  { href: "/bridge", label: "Bridge" },
   { href: "/token", label: "Token" },
   { href: "/genesis", label: "Genesis" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/base-wallet-score", label: "Wallet Score" },
   { href: "/profile", label: "Profile" },
   { href: "/settings", label: "Settings" },
-] as const;
+];
+
+const DESKTOP_NAV_ROW_1 = MAIN_NAV.slice(0, 8);
+const DESKTOP_NAV_ROW_2 = MAIN_NAV.slice(8);
 
 const connectButtonClassName =
   "flex h-9 items-center rounded-badge border border-cyan-300/30 bg-gradient-to-r from-base-blue to-indigo-600 px-2 text-[0.5rem] font-semibold uppercase tracking-tight text-white shadow-[0_0_14px_rgba(0,82,255,0.35)] transition-all hover:opacity-95 whitespace-nowrap lg:min-h-9 lg:px-2.5 lg:py-1 lg:text-[0.65rem] lg:tracking-wide";
@@ -86,23 +67,16 @@ function getDesktopNavLinkClassName(isActive: boolean) {
   }`;
 }
 
-function getMobileNavLinkClassName(isActive: boolean) {
-  return `flex min-w-0 flex-1 items-center justify-center rounded-badge border px-1 py-1 text-center text-[0.5rem] font-semibold uppercase leading-none tracking-wide transition-all sm:text-[0.55rem] sm:px-1.5 ${
+function drawerLinkClassName(isActive: boolean) {
+  return `block rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${
     isActive
-      ? "border-cyan-300/40 bg-gradient-to-r from-base-blue to-indigo-600 text-white shadow-[0_0_14px_rgba(0,82,255,0.45)]"
-      : "border-white/10 bg-white/[0.04] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+      ? "border-cyan-300/40 bg-gradient-to-r from-base-blue to-indigo-600 text-white shadow-[0_0_14px_rgba(0,82,255,0.35)]"
+      : "border-white/10 bg-white/[0.04] text-white/80 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
   }`;
 }
 
-function menuItemClassName(isActive: boolean) {
-  return `block px-3 py-2.5 text-sm font-medium transition-colors ${
-    isActive
-      ? "bg-white/10 text-white"
-      : "text-white/80 hover:bg-white/10 hover:text-white"
-  }`;
-}
-
-function WalletMenu({ pathname }: { pathname: string }) {
+/** Connected wallet control — disconnect only (no page links). */
+function WalletMenu() {
   const { address } = useAccount();
   const { disconnect, isPending: isDisconnecting } = useWalletDisconnect();
   const [isOpen, setIsOpen] = useState(false);
@@ -183,46 +157,6 @@ function WalletMenu({ pathname }: { pathname: string }) {
             }}
             className={menuPanelClassName}
           >
-            {/* Mobile-only dropdown items */}
-            <div className="lg:hidden">
-              {MOBILE_WALLET_MENU.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  role="menuitem"
-                  aria-current={
-                    isActiveRoute(pathname, item.href) ? "page" : undefined
-                  }
-                  onClick={() => setIsOpen(false)}
-                  className={menuItemClassName(
-                    isActiveRoute(pathname, item.href),
-                  )}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-
-            {/* Desktop dropdown items — unchanged */}
-            <div className="hidden lg:block">
-              {DESKTOP_WALLET_MENU.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  role="menuitem"
-                  aria-current={
-                    isActiveRoute(pathname, item.href) ? "page" : undefined
-                  }
-                  onClick={() => setIsOpen(false)}
-                  className={menuItemClassName(
-                    isActiveRoute(pathname, item.href),
-                  )}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-
             <button
               type="button"
               role="menuitem"
@@ -269,10 +203,176 @@ function WalletMenu({ pathname }: { pathname: string }) {
   );
 }
 
+function MobileNavDrawer({
+  open,
+  onClose,
+  pathname,
+}: {
+  open: boolean;
+  onClose: () => void;
+  pathname: string;
+}) {
+  const { status } = useAccount();
+  const { disconnect, isPending: isDisconnecting } = useWalletDisconnect();
+  const isConnected = status === "connected";
+  const [mounted, setMounted] = useState(false);
+  const titleId = useId();
+  const prevStatusRef = useRef(status);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const previous = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (
+      open &&
+      previous !== "connected" &&
+      status === "connected"
+    ) {
+      onClose();
+    }
+  }, [onClose, open, status]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose, open]);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      id="mobile-nav-drawer"
+      className={`fixed inset-0 z-[10000] lg:hidden ${
+        open ? "pointer-events-auto" : "pointer-events-none"
+      }`}
+      aria-hidden={!open}
+    >
+      <button
+        type="button"
+        aria-label="Close navigation"
+        onClick={onClose}
+        className={`absolute inset-0 bg-[#050814]/70 backdrop-blur-sm transition-opacity duration-300 ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={`absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-white/10 bg-gradient-to-br from-[#0c142e]/96 via-[#12183a]/94 to-[#151040]/96 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-transform duration-300 ease-out ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/25 to-transparent"
+        />
+
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-8 items-center justify-center rounded-full border border-cyan-200/25 bg-gradient-to-br from-base-blue via-indigo-600 to-violet-700 text-sm font-bold tracking-tight text-white shadow-[0_0_18px_rgba(0,82,255,0.4)]">
+              BQ
+            </span>
+            <p
+              id={titleId}
+              className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-cyan-100/55"
+            >
+              Menu
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close menu"
+            onClick={onClose}
+            className="inline-flex size-9 items-center justify-center rounded-badge border border-white/12 bg-white/[0.04] text-white/70 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+
+        <nav
+          aria-label="Mobile navigation"
+          className="flex-1 space-y-1.5 overflow-y-auto px-4 py-4"
+        >
+          <ul className="space-y-1.5">
+            {MAIN_NAV.map((item) => {
+              const active = isActiveRoute(pathname, item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    onClick={onClose}
+                    className={drawerLinkClassName(active)}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="border-t border-white/10 px-4 py-4">
+          {isConnected ? (
+            <button
+              type="button"
+              disabled={isDisconnecting}
+              onClick={() => {
+                disconnect();
+                onClose();
+              }}
+              className="flex h-11 w-full items-center justify-center rounded-xl border border-white/12 bg-white/[0.04] px-4 text-sm font-semibold text-white/80 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isDisconnecting ? "Disconnecting..." : "Disconnect Wallet"}
+            </button>
+          ) : (
+            <ConnectWalletButton
+              connectLabel="Connect Wallet"
+              connectingLabel="Connecting..."
+              buttonClassName={`${connectButtonClassName} h-11 w-full justify-center px-4 text-sm tracking-wide`}
+              disabledClassName={`${connectButtonDisabledClassName} h-11 w-full justify-center px-4 text-sm tracking-wide`}
+              className="w-full"
+            />
+          )}
+        </div>
+      </aside>
+    </div>,
+    document.body,
+  );
+}
+
 export default function Header() {
   const pathname = usePathname();
   const { status } = useAccount();
   const isConnected = status === "connected";
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-10 w-full min-w-0 px-4 pt-5 pb-2 sm:px-6">
@@ -282,42 +382,34 @@ export default function Header() {
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/25 to-transparent"
         />
 
-        <Link
-          href="/"
-          aria-label="Home"
-          className="relative flex size-8 shrink-0 items-center justify-center rounded-full border border-cyan-200/25 bg-gradient-to-br from-base-blue via-indigo-600 to-violet-700 text-sm font-bold tracking-tight text-white shadow-[0_0_18px_rgba(0,82,255,0.4)] transition-opacity hover:opacity-90 sm:size-9 lg:col-start-1"
-        >
-          BQ
-        </Link>
+        <div className="flex shrink-0 items-center gap-1.5 lg:contents">
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            aria-expanded={drawerOpen}
+            aria-controls="mobile-nav-drawer"
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex size-8 items-center justify-center rounded-badge border border-white/12 bg-white/[0.04] text-white/75 transition-all hover:border-cyan-300/30 hover:bg-white/[0.08] hover:text-white sm:size-9 lg:hidden"
+          >
+            <Menu className="size-4" aria-hidden />
+          </button>
 
-        {/* Mobile: primary links fit the bar — no nested horizontal scroller */}
+          <Link
+            href="/"
+            aria-label="Home"
+            className="relative flex size-8 shrink-0 items-center justify-center rounded-full border border-cyan-200/25 bg-gradient-to-br from-base-blue via-indigo-600 to-violet-700 text-sm font-bold tracking-tight text-white shadow-[0_0_18px_rgba(0,82,255,0.4)] transition-opacity hover:opacity-90 sm:size-9 lg:col-start-1"
+          >
+            BQ
+          </Link>
+        </div>
+
+        {/* Desktop: two centered rows */}
         <nav
           aria-label="Main navigation"
-          className="flex min-w-0 flex-1 items-center justify-evenly gap-1 lg:hidden"
+          className="hidden lg:col-start-2 lg:flex lg:w-full lg:flex-col lg:items-center lg:justify-center lg:justify-self-center lg:gap-1.5"
         >
-          {MOBILE_PRIMARY_NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={
-                isActiveRoute(pathname, item.href) ? "page" : undefined
-              }
-              className={getMobileNavLinkClassName(
-                isActiveRoute(pathname, item.href),
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Desktop: wrapped two-row navigation */}
-        <nav
-          aria-label="Main navigation"
-          className="hidden lg:col-start-2 lg:flex lg:w-full lg:flex-wrap lg:items-center lg:justify-center lg:justify-self-center lg:gap-x-1.5"
-        >
-          {DESKTOP_NAV.flatMap((item, index) => {
-            const link = (
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
+            {DESKTOP_NAV_ROW_1.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -330,27 +422,32 @@ export default function Header() {
               >
                 {item.label}
               </Link>
-            );
-
-            // Wrap after Token so desktop shows two balanced centered rows.
-            if (index === 6) {
-              return [
-                <span
-                  key="desktop-nav-wrap"
-                  aria-hidden
-                  className="h-3 w-full basis-full"
-                />,
-                link,
-              ];
-            }
-
-            return [link];
-          })}
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
+            {DESKTOP_NAV_ROW_2.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={
+                  isActiveRoute(pathname, item.href) ? "page" : undefined
+                }
+                className={getDesktopNavLinkClassName(
+                  isActiveRoute(pathname, item.href),
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
         </nav>
+
+        {/* Spacer keeps wallet pinned right on mobile */}
+        <div className="min-w-0 flex-1 lg:hidden" aria-hidden />
 
         <div className="flex shrink-0 items-center lg:col-start-3 lg:justify-self-end">
           {isConnected ? (
-            <WalletMenu pathname={pathname} />
+            <WalletMenu />
           ) : (
             <>
               <ConnectWalletButton
@@ -371,6 +468,12 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      <MobileNavDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        pathname={pathname}
+      />
     </header>
   );
 }

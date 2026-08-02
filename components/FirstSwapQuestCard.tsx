@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 
 type FirstSwapQuestCardProps = {
   quest?: QuestViewModel;
-  /** When true, scroll to the in-page Quick Swap section instead of navigating. */
-  scrollToSwap?: boolean;
 };
 
 /**
@@ -15,7 +13,6 @@ type FirstSwapQuestCardProps = {
  */
 export default function FirstSwapQuestCard({
   quest,
-  scrollToSwap = false,
 }: FirstSwapQuestCardProps) {
   const router = useRouter();
   const status: QuestStatus = quest?.status ?? "available";
@@ -45,14 +42,7 @@ export default function FirstSwapQuestCard({
           return;
         }
 
-        if (scrollToSwap) {
-          document
-            .getElementById("quick-swap")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-          return;
-        }
-
-        router.push("/#quick-swap");
+        router.push("/swap");
       }}
     />
   );

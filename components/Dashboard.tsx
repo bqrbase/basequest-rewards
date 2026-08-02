@@ -3,10 +3,8 @@
 import CommunityQuestCards, {
   filterBuilderQuests,
 } from "@/components/CommunityQuestCards";
-import ConnectWithBuilder from "@/components/ConnectWithBuilder";
 import ClaimNftQuestCard from "@/components/ClaimNftQuestCard";
 import DeployContractQuestCard from "@/components/DeployContractQuestCard";
-import BridgeToBaseCard from "@/components/BridgeToBaseCard";
 import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import GlassPanel from "@/components/GlassPanel";
@@ -15,7 +13,6 @@ import LevelProgressBar from "@/components/LevelProgressBar";
 import LevelUpCelebration from "@/components/LevelUpCelebration";
 import PageShell from "@/components/PageShell";
 import QuestCard from "@/components/QuestCard";
-import QuickSwapCard from "@/components/QuickSwapCard";
 import WalletStatusCard from "@/components/WalletStatusCard";
 import BqrBalanceCard from "@/components/dashboard/BqrBalanceCard";
 import DashboardLeaderboardPreview from "@/components/dashboard/DashboardLeaderboardPreview";
@@ -30,18 +27,12 @@ import { getLevel, getProgressPercent } from "@/lib/levels";
 import type { QuestId } from "@/lib/quest-engine";
 import { ui } from "@/lib/ui-styles";
 import Link from "next/link";
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { useRouter } from "next/navigation";
 
 function DashboardSkeleton() {
   return (
     <>
-      <section className={`${ui.dashSection} animate-pulse space-y-3`}>
-        <div className="mx-auto h-3 w-20 rounded bg-white/10 sm:mx-0" />
-        <div className="mx-auto h-8 w-56 rounded bg-white/10 sm:mx-0" />
-        <div className="mx-auto h-4 w-72 max-w-full rounded bg-white/10 sm:mx-0" />
-      </section>
-
       <section className={`${ui.dashSection} ${ui.gridStats}`}>
         {Array.from({ length: 4 }, (_, index) => (
           <div
@@ -94,21 +85,6 @@ export default function Dashboard() {
   const level = getLevel(totalXp);
   const levelProgress = getProgressPercent(totalXp);
 
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined") {
-      return;
-    }
-    const hash = window.location.hash;
-    if (hash !== "#quick-swap" && hash !== "#bridge-to-base") {
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById(hash.slice(1))
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }, [hydrated]);
-
   return (
     <PageShell>
       {!hydrated ? (
@@ -121,23 +97,6 @@ export default function Dashboard() {
               onDismiss={clearLevelUpCelebration}
             />
           ) : null}
-
-          {/* Hero */}
-          <section className={`${ui.dashSection} grid grid-cols-1 items-start gap-4 text-center sm:text-left lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:gap-6`}>
-            <div>
-              <p className={ui.sectionHeading}>Dashboard</p>
-              <h1 className={ui.pageTitle}>BaseQuest Rewards</h1>
-              <p className={ui.pageSubtitle}>
-                Daily rewards and engagement for the Base ecosystem.
-              </p>
-              <div className="mt-3 lg:hidden">
-                <ConnectWithBuilder variant="mobile" />
-              </div>
-            </div>
-            <div className="hidden w-full self-start lg:block lg:mt-[1.65rem]">
-              <ConnectWithBuilder variant="desktop" />
-            </div>
-          </section>
 
           {/* Progress + XP */}
           <section className={ui.dashSection}>
@@ -283,52 +242,24 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* BQR Balance */}
-          <section className={ui.dashSection}>
-            <div className={ui.sectionHeaderWrap}>
-              <p className={ui.sectionHeading}>Token</p>
-              <h2 className={ui.sectionTitle}>BQR Balance</h2>
-            </div>
-            <div className="grid grid-cols-1 items-stretch gap-4 md:max-w-xl">
-              <BqrBalanceCard />
-            </div>
-          </section>
-
-          {/* Genesis Collection */}
-          <section className={ui.dashSection}>
-            <div className={ui.sectionHeaderWrap}>
-              <p className={ui.sectionHeading}>NFT</p>
-              <h2 className={ui.sectionTitle}>Genesis Collection</h2>
-            </div>
-            <div className="grid grid-cols-1 items-stretch gap-4">
-              <GenesisCollectionCard />
-            </div>
-          </section>
-
-          {/* Trade tools */}
-          <section className={`${ui.dashSection} ${ui.dashPairGrid}`}>
+          {/* BQR Balance + Genesis Collection */}
+          <section className={`${ui.dashSection} grid grid-cols-1 items-stretch gap-6 md:grid-cols-2`}>
             <div className={ui.dashPairCell}>
-              <div className={ui.dashPairHeaderTall}>
-                <p className={ui.sectionHeading}>Swap</p>
-                <h2 className={ui.sectionTitle}>Quick Swap</h2>
-                <p className={ui.sectionDescription}>
-                  Swap tokens on Base Mainnet with live LI.FI routing.
-                </p>
+              <div className={ui.dashPairHeader}>
+                <p className={ui.sectionHeading}>Token</p>
+                <h2 className={ui.sectionTitle}>BQR Balance</h2>
               </div>
               <div className={ui.dashPairBody}>
-                <QuickSwapCard onFirstSwapQuestCompleted={applyServerProgress} />
+                <BqrBalanceCard />
               </div>
             </div>
             <div className={ui.dashPairCell}>
-              <div className={ui.dashPairHeaderTall}>
-                <p className={ui.sectionHeading}>Bridge</p>
-                <h2 className={ui.sectionTitle}>Bridge to Base</h2>
-                <p className={ui.sectionDescription}>
-                  Bridge from Ethereum, Arbitrum, Optimism, or Polygon to Base.
-                </p>
+              <div className={ui.dashPairHeader}>
+                <p className={ui.sectionHeading}>NFT</p>
+                <h2 className={ui.sectionTitle}>Genesis Collection</h2>
               </div>
               <div className={ui.dashPairBody}>
-                <BridgeToBaseCard onBridgeQuestCompleted={applyServerProgress} />
+                <GenesisCollectionCard />
               </div>
             </div>
           </section>
@@ -400,11 +331,9 @@ export default function Dashboard() {
               />
               <FirstSwapQuestCard
                 quest={quests.find((quest) => quest.id === "first-swap")}
-                scrollToSwap
               />
               <BridgeToBaseQuestCard
                 quest={quests.find((quest) => quest.id === "bridge-to-base")}
-                scrollToBridge
               />
               {filterBuilderQuests(quests).map((quest) => (
                 <QuestCard
