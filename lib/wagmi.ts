@@ -101,24 +101,23 @@ export function createBaseAppWagmiConfig(): Config {
 /**
  * Farcaster connectors — dynamically imports farcasterMiniApp so Base App
  * never evaluates that module during boot.
+ *
+ * Register farcasterMiniApp only. Farcaster clients often also expose
+ * window.ethereum; registering injected/WC lets reconnect bind the wrong
+ * EIP-1193 provider and break wallet_sendCalls / eth_sendTransaction.
  */
 export async function createFarcasterWagmiConfig(): Promise<Config> {
   const { farcasterMiniApp } = await import(
     "@farcaster/miniapp-wagmi-connector"
   );
 
-  return createSharedConfig([
-    farcasterMiniApp(),
-    injected(),
-    createCoinbaseWalletConnector(),
-    createWalletConnectConnector(),
-  ]);
+  return createSharedConfig([farcasterMiniApp()]);
 }
 
 /**
  * Environment-aware wagmi config factory.
  * - Browser: injected, coinbaseWallet, walletConnect
- * - Farcaster: farcasterMiniApp, injected, coinbaseWallet, walletConnect
+ * - Farcaster: farcasterMiniApp only
  * - Base App: baseAccount, coinbaseWallet, injected, walletConnect
  */
 export async function createWagmiConfig(host: WalletHost): Promise<Config> {

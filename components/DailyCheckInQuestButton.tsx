@@ -49,7 +49,12 @@ function isMethodUnsupported(error: unknown): boolean {
   const message = (
     error instanceof Error ? error.message : String(error)
   ).toLowerCase();
+  const name = error instanceof Error ? error.name.toLowerCase() : "";
+  // viem/ox: "The Provider does not support the requested method."
+  // ("does not support" ≠ "not supported")
   return (
+    name.includes("unsupportedmethod") ||
+    message.includes("does not support") ||
     message.includes("not supported") ||
     message.includes("unsupported") ||
     message.includes("method not found") ||
@@ -64,10 +69,14 @@ function isVersionMismatch(error: unknown): boolean {
   const message = (
     error instanceof Error ? error.message : String(error)
   ).toLowerCase();
+  // Ignore viem footers like "Version: viem@2.x" — they blocked eth_sendTransaction fallback.
+  const withoutViemFooter = message.replace(/version:\s*viem@[\d.]+/g, "");
   return (
-    message.includes("version") ||
-    message.includes("invalid params") ||
-    message.includes("cannot parse")
+    withoutViemFooter.includes("unsupported version") ||
+    withoutViemFooter.includes("invalid version") ||
+    withoutViemFooter.includes("version mismatch") ||
+    withoutViemFooter.includes("invalid params") ||
+    withoutViemFooter.includes("cannot parse")
   );
 }
 
@@ -243,6 +252,8 @@ export default function DailyCheckInQuestButton({
         }
 
         // Only when every wallet_sendCalls attempt reports method unsupported.
+        // Omit chainId from the tx object — some Mini App providers reject it.
+        // Chain is already enforced via ensureBaseMainnetReady().
         const hash = (await client.request({
           method: "eth_sendTransaction",
           params: [
@@ -250,7 +261,6 @@ export default function DailyCheckInQuestButton({
               from,
               to: CHECK_IN_ADDRESS,
               data,
-              chainId: BASE_CHAIN_ID_HEX,
             },
           ],
         })) as Hex;
