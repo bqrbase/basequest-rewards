@@ -76,6 +76,7 @@ export function extractSupabaseError(error: unknown): SupabaseInsertErrorInfo {
 
 /**
  * Insert a deployed contract row using the service-role admin client.
+ * If the contract_address (or tx_hash) already exists, return the existing row.
  * Server-only — never call from the browser.
  */
 export async function saveDeployedContract(
@@ -92,13 +93,44 @@ export async function saveDeployedContract(
     throw configError;
   }
 
+  const contractAddress = input.contractAddress.toLowerCase();
   const payload = {
     wallet_address: normalizeWalletAddress(input.walletAddress),
     template_id: input.templateId,
-    contract_address: input.contractAddress.toLowerCase(),
+    contract_address: contractAddress,
     tx_hash: input.txHash ?? null,
     chain_id: input.chainId,
   };
+
+  // Idempotent: treat an already-persisted contract as success.
+  const existingByAddress = await supabase
+    .from("deployed_contracts")
+    .select("*")
+    .eq("contract_address", contractAddress)
+    .maybeSingle();
+
+  if (existingByAddress.error) {
+    const info = extractSupabaseError(existingByAddress.error);
+    logSupabaseError("saveDeployedContract", "select existing", existingByAddress.error, {
+      contractAddress,
+      code: info.code,
+      message: info.message,
+    });
+  } else if (existingByAddress.data) {
+    return existingByAddress.data as DeployedContractRow;
+  }
+
+  if (payload.tx_hash) {
+    const existingByTx = await supabase
+      .from("deployed_contracts")
+      .select("*")
+      .eq("tx_hash", payload.tx_hash)
+      .maybeSingle();
+
+    if (!existingByTx.error && existingByTx.data) {
+      return existingByTx.data as DeployedContractRow;
+    }
+  }
 
   const { data, error } = await supabase
     .from("deployed_contracts")
@@ -108,6 +140,19 @@ export async function saveDeployedContract(
 
   if (error) {
     const info = extractSupabaseError(error);
+
+    // Unique violation / race: another writer inserted first — return existing.
+    if (info.code === "23505") {
+      const raced = await supabase
+        .from("deployed_contracts")
+        .select("*")
+        .eq("contract_address", contractAddress)
+        .maybeSingle();
+      if (raced.data) {
+        return raced.data as DeployedContractRow;
+      }
+    }
+
     logSupabaseError("saveDeployedContract", "insert", error, {
       payload,
       code: info.code,

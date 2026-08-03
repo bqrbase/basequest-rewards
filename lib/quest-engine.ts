@@ -304,6 +304,14 @@ export function getTodayDateString(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/** UTC calendar day as YYYY-MM-DD (Deploy Contract daily XP gate). */
+export function getUtcTodayDateString(date = new Date()): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function normalizeCheckInDate(
   value: string | null | undefined,
 ): string | null {

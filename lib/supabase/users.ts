@@ -18,6 +18,7 @@ import { logSupabaseError } from "@/lib/supabase/errors";
  *   streak integer not null default 0,
  *   last_checkin date,
  *   completed_quests jsonb not null default '[]'::jsonb,
+ *     -- may also include daily markers: "deploy-contract:YYYY-MM-DD"
  *   twitter_user_id text,
  *   x_username text,
  *   x_follow_verified_at timestamptz,

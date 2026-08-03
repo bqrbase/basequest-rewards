@@ -87,13 +87,31 @@ export async function verifyBaseSwapTx(params: {
 
     return { ok: true, receipt, txHash };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to verify transaction on Base.";
+    const name =
+      error && typeof error === "object" && "name" in error
+        ? String((error as { name?: unknown }).name)
+        : "";
+
+    // Viem throws when the receipt is not yet indexed on the RPC.
+    if (
+      name.includes("TransactionReceiptNotFound") ||
+      /receipt.*not found|could not be found/i.test(message)
+    ) {
+      return {
+        ok: false,
+        error: "receipt_not_found",
+        message: "Transaction receipt not found on Base yet.",
+      };
+    }
+
     return {
       ok: false,
       error: "rpc_error",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Failed to verify transaction on Base.",
+      message,
     };
   }
 }

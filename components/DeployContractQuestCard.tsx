@@ -11,23 +11,22 @@ type DeployContractQuestCardProps = {
 };
 
 /**
- * Deploy Contract quest card — opens template modal and runs Hello Base deploy.
+ * Deploy Contract — permanent action card.
+ * Always available for unlimited deploys; XP is awarded once per UTC day server-side.
  */
 export default function DeployContractQuestCard({
   quest,
   onCompleted,
 }: DeployContractQuestCardProps) {
   const [open, setOpen] = useState(false);
-  const status: QuestStatus = quest?.status ?? "available";
+  // Presentation is always active — never show Completed / disabled CTA.
+  const status: QuestStatus = "available";
   const reward = quest?.reward ?? "+50 XP";
   const title = quest?.title ?? "Deploy Contract";
   const description =
     quest?.description ??
     "Choose a contract template and deploy your first contract on Base.";
-  const ctaLabel =
-    status === "completed"
-      ? "Completed"
-      : (quest?.ctaLabel ?? "Deploy Contract");
+  const ctaLabel = "Deploy Contract";
 
   return (
     <>
@@ -38,11 +37,8 @@ export default function DeployContractQuestCard({
         reward={reward}
         status={status}
         ctaLabel={ctaLabel}
-        frequencyLabel="One-Time"
+        frequencyLabel="Daily XP"
         onAction={() => {
-          if (status === "locked") {
-            return;
-          }
           setOpen(true);
         }}
       />

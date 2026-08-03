@@ -1,3 +1,4 @@
+import { mergeCompletedQuestsForDb } from "@/lib/quests/deployContractDailyReward";
 import {
   getDefaultProgress,
   type QuestProgress,
@@ -82,6 +83,7 @@ export async function fetchOrCreateUserAdmin(
 export async function saveUserProgressAdmin(
   walletAddress: string,
   progress: QuestProgress,
+  options?: { completedQuestsOverride?: string[] },
 ): Promise<void> {
   assertServer();
   const normalizedAddress = normalizeWalletAddress(walletAddress);
@@ -98,9 +100,37 @@ export async function saveUserProgressAdmin(
     throw configError;
   }
 
+  // Preserve deploy-contract:YYYY-MM-DD markers unless caller overrides.
+  let completedQuests: string[] = progress.completedQuestIds;
+  if (options?.completedQuestsOverride) {
+    completedQuests = options.completedQuestsOverride;
+  } else {
+    const { data: current, error: readError } = await supabase
+      .from("users")
+      .select("completed_quests")
+      .eq("wallet_address", normalizedAddress)
+      .maybeSingle();
+
+    if (readError) {
+      logSupabaseError("saveUserProgressAdmin", "select markers", readError, {
+        walletAddress: normalizedAddress,
+      });
+    } else {
+      completedQuests = mergeCompletedQuestsForDb({
+        questIds: progress.completedQuestIds,
+        existingCompletedQuests: current?.completed_quests,
+      });
+    }
+  }
+
+  const update = {
+    ...progressToUserUpdate(progress),
+    completed_quests: completedQuests,
+  };
+
   const { error } = await supabase
     .from("users")
-    .update(progressToUserUpdate(progress))
+    .update(update)
     .eq("wallet_address", normalizedAddress);
 
   if (error) {

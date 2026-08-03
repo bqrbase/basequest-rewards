@@ -5,6 +5,7 @@ import {
 } from "@/lib/quests/awardOneTimeQuest";
 import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
+import { loadProgressAdmin } from "@/lib/supabase/usersServer";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -17,8 +18,9 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/deploy-contract/complete
- * Completes the deploy-contract quest and awards XP (with Genesis bonus when eligible).
- * Requires wallet ownership session. Contract persistence: POST /api/contracts/save.
+ * Awards Deploy Contract XP at most once per UTC day (Genesis bonus when eligible).
+ * Already-rewarded-today is a successful 200 with awardedXP = 0 — never an error.
+ * Requires wallet ownership. Contract persistence: POST /api/contracts/save.
  */
 export async function POST(request: Request) {
   try {
@@ -48,21 +50,47 @@ export async function POST(request: Request) {
       return ownership.response;
     }
 
-    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
-      await awardOneTimeQuest({
-        walletAddress,
-        questId: "deploy-contract",
+    try {
+      const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
+        await awardOneTimeQuest({
+          walletAddress,
+          questId: "deploy-contract",
+        });
+
+      return NextResponse.json({
+        success: true,
+        alreadyCompleted,
+        alreadyRewardedToday: alreadyCompleted,
+        contractAddress: contractAddress?.toLowerCase() ?? null,
+        baseXP,
+        bonusXP,
+        awardedXP,
+        progress: progressResponse(progress),
+      });
+    } catch (awardError) {
+      // Never fail the deploy success UX for reward bookkeeping issues.
+      // Return current progress with 0 XP awarded.
+      const info = extractSupabaseError(awardError);
+      console.error("[deploy-contract/complete] award failed (soft)", {
+        code: info.code,
+        message: info.message,
+        details: info.details,
+        hint: info.hint,
       });
 
-    return NextResponse.json({
-      success: true,
-      alreadyCompleted,
-      contractAddress: contractAddress?.toLowerCase() ?? null,
-      baseXP,
-      bonusXP,
-      awardedXP,
-      progress: progressResponse(progress),
-    });
+      const progress = await loadProgressAdmin(walletAddress);
+      return NextResponse.json({
+        success: true,
+        alreadyCompleted: true,
+        alreadyRewardedToday: true,
+        contractAddress: contractAddress?.toLowerCase() ?? null,
+        baseXP: 0,
+        bonusXP: 0,
+        awardedXP: 0,
+        progress: progressResponse(progress),
+        warning: info.message,
+      });
+    }
   } catch (error) {
     const info = extractSupabaseError(error);
     console.error("[deploy-contract/complete]", {

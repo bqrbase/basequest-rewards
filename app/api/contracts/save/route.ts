@@ -4,7 +4,10 @@ import {
   extractSupabaseError,
   saveDeployedContract,
 } from "@/lib/supabase/deployedContracts";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
+import {
+  verifyBaseSwapTx,
+  type VerifyBaseSwapTxResult,
+} from "@/lib/swap/verifyBaseSwapTx";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -27,6 +30,52 @@ function isTxHash(value: string): boolean {
 }
 
 const BASE_MAINNET_CHAIN_ID = 8453;
+const VERIFY_ATTEMPTS = 5;
+const VERIFY_RETRY_MS = 800;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Deploy txs are confirmed client-side first; the server's public RPC can lag.
+ * Retry transient rpc / missing-receipt failures before failing the save.
+ */
+async function verifyDeployTxWithRetry(params: {
+  txHash: string;
+  walletAddress: string;
+}): Promise<VerifyBaseSwapTxResult> {
+  let last: VerifyBaseSwapTxResult | null = null;
+
+  for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt++) {
+    last = await verifyBaseSwapTx(params);
+    if (last.ok) {
+      return last;
+    }
+
+    const retryable =
+      last.error === "rpc_error" || last.error === "receipt_not_found";
+    if (!retryable || attempt === VERIFY_ATTEMPTS) {
+      return last;
+    }
+
+    console.warn("[api/contracts/save] tx verify retry", {
+      attempt,
+      error: last.error,
+      message: last.message,
+      txHash: params.txHash,
+    });
+    await sleep(VERIFY_RETRY_MS * attempt);
+  }
+
+  return (
+    last ?? {
+      ok: false,
+      error: "rpc_error",
+      message: "Failed to verify deployment transaction on Base.",
+    }
+  );
+}
 
 /**
  * POST /api/contracts/save
@@ -98,11 +147,18 @@ export async function POST(request: Request) {
     }
 
     if (txHash) {
-      const verification = await verifyBaseSwapTx({
+      const verification = await verifyDeployTxWithRetry({
         txHash,
         walletAddress,
       });
       if (!verification.ok) {
+        console.error("[api/contracts/save] tx verification failed", {
+          walletAddress,
+          txHash,
+          contractAddress,
+          error: verification.error,
+          message: verification.message,
+        });
         return NextResponse.json(
           {
             success: false,
@@ -139,7 +195,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: info.message,
+        error: info.code || "save_failed",
+        message: info.message,
         supabase: {
           code: info.code ?? null,
           message: info.message,

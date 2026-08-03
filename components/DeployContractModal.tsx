@@ -54,7 +54,8 @@ const TEMPLATES: DeployContractTemplate[] = [
 type DeployContractModalProps = {
   open: boolean;
   onClose: () => void;
-  questStatus: QuestStatus;
+  /** Kept for caller compatibility; Deploy Contract is a permanent action. */
+  questStatus?: QuestStatus;
   onQuestCompleted: (progress: QuestProgress) => void;
 };
 
@@ -72,7 +73,6 @@ type DeploySuccessState = {
 export default function DeployContractModal({
   open,
   onClose,
-  questStatus,
   onQuestCompleted,
 }: DeployContractModalProps) {
   const titleId = useId();
@@ -118,11 +118,6 @@ export default function DeployContractModal({
       return;
     }
 
-    if (questStatus === "completed") {
-      setErrorMessage("You already completed the Deploy Contract quest.");
-      return;
-    }
-
     setIsDeploying(true);
     setErrorMessage(null);
 
@@ -150,6 +145,15 @@ export default function DeployContractModal({
         return;
       }
 
+      // On-chain deploy already succeeded — always show success UI from here.
+      setSuccess({
+        contractAddress: result.contractAddress,
+        txHash: result.txHash,
+        chainId: result.chainId,
+      });
+      setStep("success");
+      setErrorMessage(null);
+
       const saveResponse = await fetch("/api/contracts/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -163,44 +167,39 @@ export default function DeployContractModal({
         }),
       });
 
-      const saveJson = (await saveResponse.json()) as {
+      const saveBodyText = await saveResponse.text();
+      let saveJson: {
         success?: boolean;
         error?: string;
+        message?: string;
         supabase?: {
           code?: string | null;
           message?: string | null;
           details?: string | null;
           hint?: string | null;
         };
-      };
-
-      setSuccess({
-        contractAddress: result.contractAddress,
-        txHash: result.txHash,
-        chainId: result.chainId,
-      });
-      setStep("success");
+      } = {};
+      try {
+        saveJson = saveBodyText
+          ? (JSON.parse(saveBodyText) as typeof saveJson)
+          : {};
+      } catch {
+        saveJson = {};
+      }
 
       if (!saveResponse.ok || !saveJson.success) {
-        console.error(
-          "[DeployContractModal] /api/contracts/save failed:",
-          saveJson,
-        );
-        const supabaseParts = [
-          saveJson.supabase?.code ? `code=${saveJson.supabase.code}` : null,
-          saveJson.supabase?.message || saveJson.error || null,
-          saveJson.supabase?.details
-            ? `details=${saveJson.supabase.details}`
-            : null,
-          saveJson.supabase?.hint ? `hint=${saveJson.supabase.hint}` : null,
-        ].filter(Boolean);
-
-        setErrorMessage(
-          supabaseParts.length > 0
-            ? supabaseParts.join(" | ")
-            : "Contract deployed onchain, but saving failed.",
-        );
-        return;
+        // Persist failure must not override the successful deploy UI.
+        console.error("[DeployContractModal] /api/contracts/save failed:", {
+          httpStatus: saveResponse.status,
+          statusText: saveResponse.statusText,
+          responseBody: saveJson,
+          rawBody: saveBodyText,
+          serverError: saveJson.error ?? null,
+          serverMessage: saveJson.message ?? null,
+          supabase: saveJson.supabase ?? null,
+          contractAddress: result.contractAddress,
+          txHash: result.txHash,
+        });
       }
 
       const completeResponse = await fetch(
@@ -216,21 +215,39 @@ export default function DeployContractModal({
         },
       );
 
-      const completeJson = (await completeResponse.json()) as {
+      const completeBodyText = await completeResponse.text();
+      let completeJson: {
         success?: boolean;
         error?: string;
+        alreadyCompleted?: boolean;
+        alreadyRewardedToday?: boolean;
+        awardedXP?: number;
         progress?: QuestProgress;
-      };
+      } = {};
+      try {
+        completeJson = completeBodyText
+          ? (JSON.parse(completeBodyText) as typeof completeJson)
+          : {};
+      } catch {
+        completeJson = {};
+      }
 
-      if (completeResponse.ok && completeJson.success && completeJson.progress) {
-        onQuestCompleted(completeJson.progress);
+      // Server is the only XP authority — apply returned progress only.
+      // alreadyRewardedToday / awardedXP === 0 is still success (no modal error).
+      if (completeResponse.ok && completeJson.success) {
+        if (completeJson.progress) {
+          onQuestCompleted(completeJson.progress);
+        }
         return;
       }
 
-      setErrorMessage(
-        completeJson.error ||
-          "Contract saved, but quest completion failed. Refresh and check progress.",
-      );
+      console.error("[DeployContractModal] deploy-contract complete failed:", {
+        httpStatus: completeResponse.status,
+        statusText: completeResponse.statusText,
+        responseBody: completeJson,
+        rawBody: completeBodyText,
+        serverError: completeJson.error ?? null,
+      });
     } catch (error) {
       if (isBaseMainnetSwitchRejected(error)) {
         setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
@@ -411,25 +428,15 @@ export default function DeployContractModal({
               </button>
               <button
                 type="button"
-                disabled={
-                  isDeploying ||
-                  !isWalletConnected ||
-                  questStatus === "completed"
-                }
+                disabled={isDeploying || !isWalletConnected}
                 onClick={() => void handleDeploy()}
                 className={`${
-                  isDeploying ||
-                  !isWalletConnected ||
-                  questStatus === "completed"
+                  isDeploying || !isWalletConnected
                     ? `${ui.secondaryButton} cursor-not-allowed opacity-70`
                     : ui.primaryButton
                 } w-full sm:flex-1`}
               >
-                {isDeploying
-                  ? "Deploying…"
-                  : questStatus === "completed"
-                    ? "Already Completed"
-                    : "Deploy"}
+                {isDeploying ? "Deploying…" : "Deploy"}
               </button>
             </div>
           </>

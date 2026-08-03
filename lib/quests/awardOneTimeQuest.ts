@@ -1,8 +1,14 @@
 import { resolveServerGenesisAccess } from "@/lib/genesis/holder/server";
 import { awardGenesisAdjustedXp } from "@/lib/genesis/xp/award";
 import {
+  deployContractDailyMarker,
+  hasDeployContractRewardOnUtcDay,
+  mergeCompletedQuestsForDb,
+} from "@/lib/quests/deployContractDailyReward";
+import {
   completeOneTimeQuest,
   findQuestDefinition,
+  getUtcTodayDateString,
   performDailyCheckIn,
   QUEST_DEFINITIONS,
   type QuestId,
@@ -21,6 +27,69 @@ export type AwardOneTimeQuestResult = {
   bonusXP: number;
   awardedXP: number;
 };
+
+/**
+ * Deploy Contract XP: once per UTC day per wallet.
+ * Uses completed_quests markers (deploy-contract:YYYY-MM-DD) — no extra column required.
+ * Deployments remain unlimited; only the reward is gated.
+ */
+async function awardDeployContractDailyXp(params: {
+  walletAddress: string;
+  progress: QuestProgress;
+  existingCompletedQuests: unknown;
+  baseXP: number;
+  bonusXP: number;
+  awardedXP: number;
+}): Promise<AwardOneTimeQuestResult> {
+  const todayUtc = getUtcTodayDateString();
+
+  if (hasDeployContractRewardOnUtcDay(params.existingCompletedQuests, todayUtc)) {
+    return {
+      progress: params.progress,
+      alreadyCompleted: true,
+      baseXP: params.baseXP,
+      bonusXP: 0,
+      awardedXP: 0,
+    };
+  }
+
+  const completedQuestIds: QuestId[] =
+    params.progress.completedQuestIds.includes("deploy-contract")
+      ? params.progress.completedQuestIds
+      : [...params.progress.completedQuestIds, "deploy-contract"];
+
+  const progress: QuestProgress = {
+    ...params.progress,
+    totalXp: params.progress.totalXp + params.awardedXP,
+    completedQuestIds,
+  };
+
+  const completedQuestsForDb = mergeCompletedQuestsForDb({
+    questIds: completedQuestIds,
+    existingCompletedQuests: params.existingCompletedQuests,
+    extraMarkers: [deployContractDailyMarker(todayUtc)],
+  });
+
+  try {
+    await saveUserProgressAdmin(params.walletAddress, progress, {
+      completedQuestsOverride: completedQuestsForDb,
+    });
+  } catch (progressError) {
+    console.error(
+      "[awardOneTimeQuest] saveUserProgressAdmin (deploy-contract daily)",
+      progressError,
+    );
+    throw progressError;
+  }
+
+  return {
+    progress,
+    alreadyCompleted: false,
+    baseXP: params.baseXP,
+    bonusXP: params.bonusXP,
+    awardedXP: params.awardedXP,
+  };
+}
 
 /**
  * Shared server helper: award a quest via the quest engine with Genesis XP
@@ -78,6 +147,18 @@ export async function awardOneTimeQuest(params: {
       bonusXP: didAward ? bonusXP : 0,
       awardedXP: didAward ? awardedXP : 0,
     };
+  }
+
+  // Deploy Contract: once-per-UTC-day XP; unlimited deployments.
+  if (params.questId === "deploy-contract") {
+    return awardDeployContractDailyXp({
+      walletAddress: params.walletAddress,
+      progress,
+      existingCompletedQuests: user?.completed_quests ?? [],
+      baseXP,
+      bonusXP,
+      awardedXP,
+    });
   }
 
   if (alreadyCompleted) {
