@@ -16,6 +16,7 @@ import {
   resolveWalletHost,
   type WalletHost,
 } from "@/lib/wagmi";
+import { WalletHostProvider } from "@/lib/wallet/WalletHostContext";
 import { Suspense, useEffect, useState } from "react";
 import { WagmiProvider, type Config } from "wagmi";
 import { base } from "wagmi/chains";
@@ -128,12 +129,14 @@ export default function Providers({ children }: ProvidersProps) {
             },
           }}
         >
-          <Suspense fallback={null}>
-            <ReferralCapture />
-          </Suspense>
-          <ReferralLifecycle />
-          <WalletAuthLifecycle />
-          {children}
+          <WalletHostProvider host={host}>
+            <Suspense fallback={null}>
+              <ReferralCapture />
+            </Suspense>
+            <ReferralLifecycle />
+            <WalletAuthLifecycle />
+            {children}
+          </WalletHostProvider>
         </OnchainKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

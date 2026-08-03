@@ -19,8 +19,8 @@ deployable, reversible commit.
 
 | Phase | Scope | Status |
 |-------|--------|--------|
-| 0 | Add `lib/wallet/*` engine (unused by call sites) | active |
-| 1 | Connect Wallet + Authentication only | next |
+| 0 | Add `lib/wallet/*` engine (unused by call sites) | done |
+| 1 | Connect Wallet + Authentication only | active |
 | 2 | Daily Check-in (`executeCalls`) | pending |
 | 3 | Deploy Contract | pending |
 | 4 | Remaining writes (badge, rewards, genesis, swap, bridge, x402) | pending |
