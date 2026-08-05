@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { toFunctionSelector } from "viem";
+import { DAILY_CHECK_IN_ADDRESS } from "@/lib/contracts/DailyCheckIn";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
-import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -15,9 +16,11 @@ type CompleteBody = {
   txHash?: string;
 };
 
+const CHECK_IN_SELECTOR = toFunctionSelector("checkIn()");
+
 /**
- * POST /api/quests/x402-payment/complete
- * Requires verified payment tx from the claimed wallet.
+ * POST /api/quests/daily-check-in/complete
+ * Awards Daily Check-in XP only after on-chain verification of checkIn().
  */
 export async function POST(request: Request) {
   try {
@@ -49,10 +52,13 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseSwapTx({
+    const verification = await verifyBaseTransactionWithRetry({
       txHash,
       walletAddress,
+      expectedTo: DAILY_CHECK_IN_ADDRESS,
+      expectedFunctionSelector: CHECK_IN_SELECTOR,
     });
+
     if (!verification.ok) {
       return NextResponse.json(
         {
@@ -64,34 +70,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const { progress, alreadyCompleted, baseXP, bonusXP, awardedXP } =
-      await awardOneTimeQuest({
-        walletAddress,
-        questId: "x402-payment",
-      });
+    const result = await awardOneTimeQuest({
+      walletAddress,
+      questId: "daily-check-in",
+    });
 
     return NextResponse.json({
       success: true,
-      alreadyCompleted,
+      alreadyCompleted: result.alreadyCompleted,
+      baseXP: result.baseXP,
+      bonusXP: result.bonusXP,
+      awardedXP: result.awardedXP,
       txHash: verification.txHash,
-      baseXP,
-      bonusXP,
-      awardedXP,
-      progress: progressResponse(progress),
+      progress: progressResponse(result.progress),
     });
   } catch (error) {
-    const info = extractSupabaseError(error);
-    console.error("[x402-payment/complete]", {
-      code: info.code,
-      message: info.message,
-      details: info.details,
-      hint: info.hint,
-      raw: info.raw,
-    });
+    console.error("[quests/daily-check-in/complete]", error);
     return NextResponse.json(
       {
         success: false,
-        error: info.message,
+        error:
+          error instanceof Error ? error.message : "daily_check_in_complete_failed",
       },
       { status: 500 },
     );

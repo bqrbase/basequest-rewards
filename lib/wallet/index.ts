@@ -1,6 +1,5 @@
 /**
- * BaseQuest client wallet layer — single entry for connect/auth/chain/tx.
- * Server auth cookies remain under lib/wallet/auth/*.
+ * BaseQuest client wallet layer — single entry for connect/chain/tx.
  */
 
 export * from "@/lib/wallet/types";
@@ -27,14 +26,6 @@ export {
   getActiveChainId,
   isSwitchRejectedError,
 } from "@/lib/wallet/ChainManager";
-
-export { signWalletMessage } from "@/lib/wallet/Signer";
-
-export {
-  checkAuthSession,
-  ensureAuthSession,
-  requireAuthSession,
-} from "@/lib/wallet/Authentication";
 
 export {
   getConnectedAddress,

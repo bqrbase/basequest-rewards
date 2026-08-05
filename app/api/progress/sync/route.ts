@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireWalletOwnership } from "@/lib/wallet/auth/verifyOwnership";
 import {
   fetchOrCreateUserAdmin,
 } from "@/lib/supabase/usersServer";
@@ -16,8 +15,9 @@ type SyncBody = {
 
 /**
  * POST /api/progress/sync
- * Loads (or creates) authoritative server progress for a verified wallet.
- * Client must not write XP directly — this is the read/create entrypoint.
+ * Loads (or creates) authoritative server progress for a wallet address.
+ * Does not award XP. On-chain quest XP requires transaction verification
+ * on dedicated complete endpoints.
  */
 export async function POST(request: Request) {
   try {
@@ -40,18 +40,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await requireWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: ownership.error,
-          message: ownership.message,
-        },
-        { status: 401 },
-      );
-    }
-
     const user = await fetchOrCreateUserAdmin(walletAddress);
     if (!user) {
       return NextResponse.json(

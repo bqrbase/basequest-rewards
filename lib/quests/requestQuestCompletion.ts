@@ -7,31 +7,14 @@ export type QuestCompletionClientResult = {
   error?: string;
 };
 
-type EnsureAuthFn = () => Promise<{ ok: true } | { ok: false; error: string }>;
-
 /**
  * Shared client helper for POST quest complete API endpoints.
- * Lazily authenticates when `ensureAuth` is provided (preferred).
  */
 export async function requestQuestCompletion(params: {
   endpoint: string;
   body: Record<string, unknown>;
-  /** Call before the protected request — prompts to sign only if needed. */
-  ensureAuth?: EnsureAuthFn;
 }): Promise<QuestCompletionClientResult> {
   try {
-    if (params.ensureAuth) {
-      const auth = await params.ensureAuth();
-      if (!auth.ok) {
-        return {
-          success: false,
-          alreadyCompleted: false,
-          progress: null,
-          error: auth.error || "wallet_auth_required",
-        };
-      }
-    }
-
     const response = await fetch(params.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -1,27 +1,40 @@
 "use client";
 
-import { clearWalletAuthClientSession } from "@/lib/wallet/auth/clientLogout";
-import { useQueryClient } from "@tanstack/react-query";
+import { BASEQUEST_GENESIS_ADDRESS } from "@/lib/contracts/abi/BaseQuestGenesis";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useDisconnect } from "wagmi";
 
+/** Drop cached Genesis holder reads so access resets after disconnect. */
+function resetGenesisAccessQueries(queryClient: QueryClient) {
+  const genesisAddress = BASEQUEST_GENESIS_ADDRESS.toLowerCase();
+
+  queryClient.removeQueries({
+    predicate: (query) => {
+      try {
+        return JSON.stringify(query.queryKey).toLowerCase().includes(genesisAddress);
+      } catch {
+        return false;
+      }
+    },
+  });
+}
+
 /**
- * Disconnects the wallet after clearing ownership session cookies and
- * Genesis access query cache. UI callers keep the same disconnect API.
+ * Disconnects the wallet and clears Genesis access query cache.
+ * UI callers keep the same disconnect API.
  */
 export function useWalletDisconnect() {
   const queryClient = useQueryClient();
   const { disconnect, disconnectAsync, isPending, ...rest } = useDisconnect();
 
   const disconnectWallet = useCallback(() => {
-    void (async () => {
-      await clearWalletAuthClientSession(queryClient);
-      disconnect();
-    })();
+    resetGenesisAccessQueries(queryClient);
+    disconnect();
   }, [disconnect, queryClient]);
 
   const disconnectWalletAsync = useCallback(async () => {
-    await clearWalletAuthClientSession(queryClient);
+    resetGenesisAccessQueries(queryClient);
     await disconnectAsync();
   }, [disconnectAsync, queryClient]);
 

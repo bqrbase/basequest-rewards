@@ -12,7 +12,6 @@ import {
   waitForTransactionReceipt,
   writeContract,
 } from "wagmi/actions";
-import { requireAuthSession } from "@/lib/wallet/Authentication";
 import { ensureChain } from "@/lib/wallet/ChainManager";
 import {
   RECEIPT_TIMEOUT_MS,
@@ -208,7 +207,6 @@ export type ExecuteCallsParams = {
   host: WalletHost;
   calls: readonly WalletCall[];
   chainId?: number;
-  requireAuth?: boolean;
   capabilities?: SendCallsCapabilities;
   /** Prefer sendCalls even if capability cache says false (will still fall back). */
   preferSendCalls?: boolean;
@@ -225,9 +223,6 @@ export async function executeCalls(
   }
 
   const address = requireConnectedAddress(params.config);
-  if (params.requireAuth !== false) {
-    await requireAuthSession({ config: params.config, address });
-  }
 
   const chainId = await ensureChain({
     config: params.config,
@@ -313,7 +308,6 @@ export type WriteContractParams = {
   config: Config;
   host: WalletHost;
   chainId?: number;
-  requireAuth?: boolean;
   abi: Abi;
   address: Address;
   functionName: string;
@@ -347,7 +341,6 @@ export async function executeWriteContract(
       config: params.config,
       host: params.host,
       chainId: params.chainId,
-      requireAuth: params.requireAuth,
       preferSendCalls: true,
       calls: [
         {
@@ -369,10 +362,7 @@ export async function executeWriteContract(
     });
   }
 
-  const address = requireConnectedAddress(params.config);
-  if (params.requireAuth !== false) {
-    await requireAuthSession({ config: params.config, address });
-  }
+  requireConnectedAddress(params.config);
 
   const chainId = await ensureChain({
     config: params.config,
@@ -405,7 +395,6 @@ export type DeployContractParams = {
   config: Config;
   host: WalletHost;
   chainId?: number;
-  requireAuth?: boolean;
   abi: Abi;
   bytecode: Hex;
   args?: readonly unknown[];
@@ -415,10 +404,7 @@ export type DeployContractParams = {
 export async function executeDeployContract(
   params: DeployContractParams,
 ): Promise<WalletTxResult & { contractAddress?: Address }> {
-  const address = requireConnectedAddress(params.config);
-  if (params.requireAuth !== false) {
-    await requireAuthSession({ config: params.config, address });
-  }
+  requireConnectedAddress(params.config);
 
   const chainId = await ensureChain({
     config: params.config,

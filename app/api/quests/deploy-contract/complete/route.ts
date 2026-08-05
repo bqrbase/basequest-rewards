@@ -3,7 +3,7 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import { loadProgressAdmin } from "@/lib/supabase/usersServer";
 import {
@@ -14,13 +14,13 @@ import {
 type CompleteBody = {
   wallet?: string;
   contractAddress?: string;
+  txHash?: string;
 };
 
 /**
  * POST /api/quests/deploy-contract/complete
- * Awards Deploy Contract XP at most once per UTC day (Genesis bonus when eligible).
- * Already-rewarded-today is a successful 200 with awardedXP = 0 — never an error.
- * Requires wallet ownership. Contract persistence: POST /api/contracts/save.
+ * Awards Deploy Contract XP after verifying the deploy transaction on Base.
+ * Already-rewarded-today is a successful 200 with awardedXP = 0.
  */
 export async function POST(request: Request) {
   try {
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
 
     const wallet = body.wallet;
     const contractAddress = body.contractAddress;
+    const txHash = body.txHash;
 
     if (!wallet || !isValidWalletAddress(wallet)) {
       return NextResponse.json(
@@ -44,10 +45,28 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!txHash || typeof txHash !== "string") {
+      return NextResponse.json(
+        { success: false, error: "valid_tx_hash_required" },
+        { status: 400 },
+      );
+    }
+
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
+    const verification = await verifyBaseTransactionWithRetry({
+      txHash,
+      walletAddress,
+      allowContractCreation: true,
+    });
+    if (!verification.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: verification.error,
+          message: verification.message,
+        },
+        { status: 400 },
+      );
     }
 
     try {
@@ -62,14 +81,13 @@ export async function POST(request: Request) {
         alreadyCompleted,
         alreadyRewardedToday: alreadyCompleted,
         contractAddress: contractAddress?.toLowerCase() ?? null,
+        txHash: verification.txHash,
         baseXP,
         bonusXP,
         awardedXP,
         progress: progressResponse(progress),
       });
     } catch (awardError) {
-      // Never fail the deploy success UX for reward bookkeeping issues.
-      // Return current progress with 0 XP awarded.
       const info = extractSupabaseError(awardError);
       console.error("[deploy-contract/complete] award failed (soft)", {
         code: info.code,
@@ -84,6 +102,7 @@ export async function POST(request: Request) {
         alreadyCompleted: true,
         alreadyRewardedToday: true,
         contractAddress: contractAddress?.toLowerCase() ?? null,
+        txHash: verification.txHash,
         baseXP: 0,
         bonusXP: 0,
         awardedXP: 0,

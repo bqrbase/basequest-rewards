@@ -24,6 +24,7 @@ export const metadata: Metadata = {
   title: APP_TITLE,
   description: APP_DESCRIPTION,
   applicationName: APP_TITLE,
+
   icons: {
     icon: [{ url: `${APP_URL}/app-icon.png`, sizes: "1024x1024", type: "image/png" }],
     apple: [{ url: `${APP_URL}/app-icon.png`, sizes: "1024x1024", type: "image/png" }],
@@ -50,9 +51,11 @@ export const metadata: Metadata = {
     description: APP_DESCRIPTION,
     images: [`${APP_URL}/og-image.png`],
   },
-  other: {
-    "base:app_id": "6a5e99b82ef8a18fb639b9e7",
-  },
+ other: {
+  "base:app_id": "6a5e99b82ef8a18fb639b9e7",
+  "talentapp:project_verification":
+    "e35d8a3bd02b677c010c6b220a93256e7b18c71ab5d78353998d8be6d8cbf5669014b9431efc8d86356f582d8949f3c27e4b865263d954eec69af1a4fd011293",
+},
 };
 
 export default function RootLayout({

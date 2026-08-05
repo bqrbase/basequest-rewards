@@ -4,7 +4,6 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
   isValidWalletAddress,
@@ -18,8 +17,8 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/mint-genesis/complete
- * Requires wallet ownership + on-chain Genesis ERC-1155 balanceOf(address, 1) > 0.
- * Awards XP once via awardOneTimeQuest.
+ * Requires on-chain Genesis ERC-1155 balanceOf(address, 1) > 0.
+ * Awards XP once via awardOneTimeQuest (no signature session).
  */
 export async function POST(request: Request) {
   try {
@@ -43,10 +42,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
-    }
 
     let balance: bigint;
     try {

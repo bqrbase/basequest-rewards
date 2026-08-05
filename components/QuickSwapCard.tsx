@@ -6,7 +6,6 @@ import QuestCompletedToast, {
   type QuestCompletedToastData,
 } from "@/components/QuestCompletedToast";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { requestQuestCompletion } from "@/lib/quests/requestQuestCompletion";
 import type { QuestProgress } from "@/lib/quest-engine";
 import {
@@ -55,7 +54,6 @@ export default function QuickSwapCard({
   const config = useConfig();
   const { address, status: walletStatus } = useAccount();
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
-  const { ensureWalletAuth } = useWalletAuth();
 
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
 
@@ -177,7 +175,6 @@ export default function QuickSwapCard({
         wallet: address,
         txHash: confirmedTxHash,
       },
-      ensureAuth: ensureWalletAuth,
     });
 
     if (!result.success || !result.progress) {

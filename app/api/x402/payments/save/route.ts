@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import {
   extractSupabaseError,
   saveX402Payment,
 } from "@/lib/supabase/x402Payments";
+import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -60,9 +60,19 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
+    const verification = await verifyBaseSwapTx({
+      txHash,
+      walletAddress,
+    });
+    if (!verification.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: verification.error,
+          message: verification.message,
+        },
+        { status: 400 },
+      );
     }
 
     const row = await saveX402Payment({

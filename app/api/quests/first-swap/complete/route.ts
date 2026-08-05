@@ -3,7 +3,6 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
@@ -18,7 +17,7 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/first-swap/complete
- * Requires wallet ownership + confirmed Base tx from that wallet.
+ * Requires confirmed Base tx from the claimed wallet (no signature session).
  */
 export async function POST(request: Request) {
   try {
@@ -50,11 +49,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
-    }
-
     const verification = await verifyBaseSwapTx({
       txHash,
       walletAddress,

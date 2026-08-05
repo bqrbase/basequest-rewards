@@ -6,6 +6,7 @@ import {
 } from "@/lib/contracts/DailyCheckIn";
 import { DATA_SUFFIX } from "@/lib/builderCode";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
+import type { QuestProgress } from "@/lib/quest-engine";
 import {
   BASE_MAINNET_REQUIRED_MESSAGE,
   isBaseMainnetSwitchRejected,
@@ -15,6 +16,7 @@ import {
   encodeFunctionData,
   getAddress,
   numberToHex,
+  type Hash,
   type Hex,
 } from "viem";
 import { base } from "viem/chains";
@@ -26,7 +28,10 @@ type DailyCheckInQuestButtonProps = {
   buttonClassName: string;
   disabledClassName: string;
   disabled?: boolean;
-  onSuccess?: () => void;
+  /** Optional local success callback with the confirmed tx hash. */
+  onSuccess?: (txHash: string) => void;
+  /** Apply verified server progress after /api/quests/daily-check-in/complete. */
+  onCompleted?: (progress: QuestProgress) => void;
 };
 
 type WalletRequestClient = {
@@ -102,7 +107,7 @@ function isTransactionHash(id: string): boolean {
 async function waitForCallsSuccess(
   client: WalletRequestClient,
   callsId: string,
-): Promise<void> {
+): Promise<Hash | null> {
   const deadline = Date.now() + 120_000;
 
   while (Date.now() < deadline) {
@@ -111,7 +116,10 @@ async function waitForCallsSuccess(
       params: [callsId],
     })) as {
       status?: number | string;
-      receipts?: Array<{ status?: Hex | string | number }>;
+      receipts?: Array<{
+        status?: Hex | string | number;
+        transactionHash?: Hash;
+      }>;
     };
 
     const code =
@@ -119,18 +127,21 @@ async function waitForCallsSuccess(
         ? Number.parseInt(status.status, 10)
         : status?.status;
 
+    const receipt = status?.receipts?.[0];
+    const receiptStatus = receipt?.status;
+    const receiptHash = receipt?.transactionHash ?? null;
+
     // EIP-5792: 200 = confirmed success
     if (code === 200) {
-      return;
+      return receiptHash;
     }
 
-    const receiptStatus = status?.receipts?.[0]?.status;
     if (
       receiptStatus === "success" ||
       receiptStatus === "0x1" ||
       receiptStatus === 1
     ) {
-      return;
+      return receiptHash;
     }
 
     if (code !== undefined && code !== 100 && code >= 400) {
@@ -149,12 +160,72 @@ export default function DailyCheckInQuestButton({
   disabledClassName,
   disabled = false,
   onSuccess,
+  onCompleted,
 }: DailyCheckInQuestButtonProps) {
   const config = useConfig();
   const { address, status: walletStatus } = useAccount();
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const completeCheckInOnServer = useCallback(
+    async (txHash: string) => {
+      if (!address) {
+        return;
+      }
+
+      onSuccess?.(txHash);
+
+      if (!onCompleted) {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/quests/daily-check-in/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            wallet: address,
+            txHash,
+          }),
+        });
+
+        const json = (await response.json()) as {
+          success?: boolean;
+          progress?: QuestProgress;
+          error?: string;
+          message?: string;
+        };
+
+        if (response.ok && json.success && json.progress) {
+          onCompleted(json.progress);
+          return;
+        }
+
+        console.error(
+          "[DailyCheckInQuestButton] daily-check-in complete failed:",
+          json.error || json.message || response.status,
+        );
+        setErrorMessage(
+          json.message ||
+            json.error ||
+            "Check-in confirmed onchain, but XP sync failed. Refresh and try again.",
+        );
+      } catch (error) {
+        console.error(
+          "[DailyCheckInQuestButton] daily-check-in complete exception:",
+          error,
+        );
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Check-in confirmed onchain, but XP sync failed.",
+        );
+      }
+    },
+    [address, onCompleted, onSuccess],
+  );
 
   const handleCheckIn = useCallback(async () => {
     if (disabled || isSubmitting) return;
@@ -269,20 +340,27 @@ export default function DailyCheckInQuestButton({
           hash,
           chainId: base.id,
         });
-        onSuccess?.();
+        await completeCheckInOnServer(hash);
         return;
       }
+
+      let txHash: string | null = null;
 
       if (isTransactionHash(batchId)) {
         await waitForTransactionReceipt(config, {
           hash: batchId as Hex,
           chainId: base.id,
         });
+        txHash = batchId;
       } else {
-        await waitForCallsSuccess(client, batchId);
+        txHash = await waitForCallsSuccess(client, batchId);
       }
 
-      onSuccess?.();
+      if (!txHash) {
+        throw new Error("Check-in confirmed but no transaction hash was returned.");
+      }
+
+      await completeCheckInOnServer(txHash);
     } catch (error) {
       if (isBaseMainnetSwitchRejected(error)) {
         setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
@@ -301,11 +379,11 @@ export default function DailyCheckInQuestButton({
     }
   }, [
     address,
+    completeCheckInOnServer,
     config,
     disabled,
     ensureBaseMainnetReady,
     isSubmitting,
-    onSuccess,
     walletStatus,
   ]);
 

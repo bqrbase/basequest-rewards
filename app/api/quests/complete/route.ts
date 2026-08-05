@@ -1,10 +1,14 @@
+/**
+ * POST /api/quests/complete — soft quests only (no on-chain proof).
+ * On-chain quests must use dedicated endpoints with transaction verification.
+ * Wallet ownership cookies / personal_sign sessions are not used.
+ */
 import { NextResponse } from "next/server";
 import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
 import { QUEST_IDS, type QuestId } from "@/lib/quest-engine";
-import { requireWalletOwnership } from "@/lib/wallet/auth/verifyOwnership";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -15,19 +19,13 @@ type CompleteBody = {
   questId?: string;
 };
 
-/** Soft / client-triggered quests that still require wallet ownership. */
-const OWNERSHIP_GATED_QUESTS = new Set<QuestId>([
-  "daily-check-in",
+/** Soft quests without an on-chain transaction (low-value / UX quests). */
+const SOFT_QUESTS = new Set<QuestId>([
   "view-leaderboard",
   "build-streak",
   "explore-base",
 ]);
 
-/**
- * POST /api/quests/complete
- * Awards XP for ownership-gated quests after wallet auth.
- * On-chain-proof quests should keep using their dedicated complete routes.
- */
 export async function POST(request: Request) {
   try {
     let body: CompleteBody = {};
@@ -62,7 +60,20 @@ export async function POST(request: Request) {
     }
 
     const typedQuestId = questId as QuestId;
-    if (!OWNERSHIP_GATED_QUESTS.has(typedQuestId)) {
+
+    if (typedQuestId === "daily-check-in") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "quest_requires_dedicated_endpoint",
+          message:
+            "Daily Check-in must be completed via /api/quests/daily-check-in/complete with a verified txHash.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!SOFT_QUESTS.has(typedQuestId)) {
       return NextResponse.json(
         {
           success: false,
@@ -75,18 +86,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await requireWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: ownership.error,
-          message: ownership.message,
-        },
-        { status: 401 },
-      );
-    }
-
     const result = await awardOneTimeQuest({
       walletAddress,
       questId: typedQuestId,

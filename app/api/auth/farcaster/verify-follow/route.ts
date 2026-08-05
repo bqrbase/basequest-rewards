@@ -8,7 +8,6 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -22,7 +21,7 @@ type VerifyBody = {
 
 /**
  * POST /api/auth/farcaster/verify-follow
- * Requires wallet ownership. Prefers FID resolved from the wallet when possible.
+ * Prefers FID resolved from the wallet when possible (no wallet signature session).
  */
 export async function POST(request: Request) {
   try {
@@ -45,10 +44,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
-    }
 
     const bodyFid =
       typeof body.fid === "number" && Number.isFinite(body.fid) && body.fid > 0

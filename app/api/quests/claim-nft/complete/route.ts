@@ -3,7 +3,7 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
+import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import { loadProgressAdmin } from "@/lib/supabase/usersServer";
 import {
@@ -15,11 +15,12 @@ type CompleteBody = {
   wallet?: string;
   contractAddress?: string;
   tokenId?: string;
+  txHash?: string;
 };
 
 /**
  * POST /api/quests/claim-nft/complete
- * Requires wallet ownership + prior deploy-contract completion.
+ * Requires verified claim tx + prior deploy-contract completion.
  */
 export async function POST(request: Request) {
   try {
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     const wallet = body.wallet;
     const contractAddress = body.contractAddress;
     const tokenId = body.tokenId;
+    const txHash = body.txHash;
 
     if (!wallet || !isValidWalletAddress(wallet)) {
       return NextResponse.json(
@@ -44,10 +46,27 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!txHash || typeof txHash !== "string") {
+      return NextResponse.json(
+        { success: false, error: "valid_tx_hash_required" },
+        { status: 400 },
+      );
+    }
+
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
+    const verification = await verifyBaseSwapTx({
+      txHash,
+      walletAddress,
+    });
+    if (!verification.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: verification.error,
+          message: verification.message,
+        },
+        { status: 400 },
+      );
     }
 
     const current = await loadProgressAdmin(walletAddress);
@@ -72,6 +91,7 @@ export async function POST(request: Request) {
       alreadyCompleted,
       contractAddress: contractAddress?.toLowerCase() ?? null,
       tokenId: tokenId ?? null,
+      txHash: verification.txHash,
       baseXP,
       bonusXP,
       awardedXP,

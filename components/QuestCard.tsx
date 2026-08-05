@@ -128,7 +128,7 @@ export default function QuestCard({
             disabled={!isActionable}
             buttonClassName={getCtaButtonClassName(true)}
             disabledClassName={getCtaButtonClassName(false)}
-            onSuccess={onAction}
+            onCompleted={onServerProgress}
           />
         ) : isFollowXQuest && onServerProgress ? (
           <FollowXQuestButton

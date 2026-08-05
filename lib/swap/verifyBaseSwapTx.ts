@@ -1,11 +1,8 @@
 import {
-  createPublicClient,
-  http,
-  isHash,
-  type Hash,
-  type TransactionReceipt,
-} from "viem";
-import { base } from "viem/chains";
+  verifyBaseTransaction,
+  type VerifyBaseTransactionResult,
+} from "@/lib/chain/verifyBaseTransaction";
+import type { Hash, TransactionReceipt } from "viem";
 
 export type VerifyBaseSwapTxResult =
   | {
@@ -24,94 +21,42 @@ export type VerifyBaseSwapTxResult =
       message: string;
     };
 
-function getBaseRpcUrl(): string {
-  return (
-    process.env.BASE_RPC_URL ||
-    process.env.NEXT_PUBLIC_BASE_RPC_URL ||
-    "https://mainnet.base.org"
-  );
-}
-
 /**
- * Confirm a swap transaction on Base Mainnet via the official RPC receipt.
- * Never treats pending / missing / reverted txs as success.
+ * Confirm a wallet-sent transaction on Base Mainnet (sender + success).
+ * Façade over verifyBaseTransaction for existing swap/claim/deploy call sites.
  */
 export async function verifyBaseSwapTx(params: {
   txHash: string;
   walletAddress: string;
 }): Promise<VerifyBaseSwapTxResult> {
-  if (!isHash(params.txHash)) {
+  const result = await verifyBaseTransaction(params);
+  return mapResult(result);
+}
+
+function mapResult(result: VerifyBaseTransactionResult): VerifyBaseSwapTxResult {
+  if (result.ok) {
     return {
-      ok: false,
-      error: "invalid_tx_hash",
-      message: "A valid transaction hash is required.",
+      ok: true,
+      receipt: result.receipt,
+      txHash: result.txHash,
     };
   }
 
-  const txHash = params.txHash as Hash;
-  const wallet = params.walletAddress.toLowerCase();
-
-  try {
-    const client = createPublicClient({
-      chain: base,
-      transport: http(getBaseRpcUrl()),
-    });
-
-    const receipt = await client.getTransactionReceipt({ hash: txHash });
-
-    if (!receipt) {
-      return {
-        ok: false,
-        error: "receipt_not_found",
-        message: "Transaction receipt not found on Base.",
-      };
-    }
-
-    if (receipt.status !== "success") {
-      return {
-        ok: false,
-        error: "tx_reverted",
-        message: "Transaction reverted on Base.",
-      };
-    }
-
-    // Queried against Base Mainnet RPC — receipt presence implies Base.
-    const tx = await client.getTransaction({ hash: txHash });
-    if (!tx?.from || tx.from.toLowerCase() !== wallet) {
-      return {
-        ok: false,
-        error: "wallet_mismatch",
-        message: "Transaction sender does not match the connected wallet.",
-      };
-    }
-
-    return { ok: true, receipt, txHash };
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to verify transaction on Base.";
-    const name =
-      error && typeof error === "object" && "name" in error
-        ? String((error as { name?: unknown }).name)
-        : "";
-
-    // Viem throws when the receipt is not yet indexed on the RPC.
-    if (
-      name.includes("TransactionReceiptNotFound") ||
-      /receipt.*not found|could not be found/i.test(message)
-    ) {
-      return {
-        ok: false,
-        error: "receipt_not_found",
-        message: "Transaction receipt not found on Base yet.",
-      };
-    }
-
+  if (
+    result.error === "invalid_wallet" ||
+    result.error === "contract_mismatch" ||
+    result.error === "function_mismatch"
+  ) {
     return {
       ok: false,
       error: "rpc_error",
-      message,
+      message: result.message,
     };
   }
+
+  return {
+    ok: false,
+    error: result.error,
+    message: result.message,
+  };
 }

@@ -9,7 +9,6 @@ import {
   X402_PRICE,
 } from "@/lib/x402/config";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { getBaseScanTxUrl, payPremiumTest } from "@/lib/x402/payPremiumTest";
 import { ui } from "@/lib/ui-styles";
 import {
@@ -48,7 +47,6 @@ export default function X402PaymentModal({
   const config = useConfig();
   const { address, status: walletStatus } = useAccount();
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
-  const { ensureWalletAuth } = useWalletAuth();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
 
   const [step, setStep] = useState<ModalStep>("start");
@@ -97,17 +95,6 @@ export default function X402PaymentModal({
     setStep("paying");
 
     try {
-      const auth = await ensureWalletAuth();
-      if (!auth.ok) {
-        setErrorMessage(
-          auth.error === "wallet_not_connected"
-            ? "Connect your wallet to start."
-            : "Sign the wallet ownership message to continue.",
-        );
-        setStep("start");
-        return;
-      }
-
       await ensureBaseMainnetReady();
 
       // Calls GET /api/premium/test. On 402, @x402/fetch runs the payment flow.

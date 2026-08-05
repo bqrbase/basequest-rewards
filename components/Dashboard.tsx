@@ -117,9 +117,7 @@ export default function Dashboard() {
                   reward={dailyCheckInQuest.reward}
                   status={dailyCheckInQuest.status}
                   ctaLabel={dailyCheckInQuest.ctaLabel}
-                  onAction={() =>
-                    handleQuestAction(dailyCheckInQuest.id as QuestId)
-                  }
+                  onServerProgress={applyServerProgress}
                 />
               ) : null}
               <DeployContractQuestCard

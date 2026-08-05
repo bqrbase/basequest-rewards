@@ -3,9 +3,9 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { LIFI_BASE_CHAIN_ID } from "@/lib/swap/lifi";
 import { verifyBaseDestinationTx } from "@/lib/swap/verifyBaseDestinationTx";
+import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
   isValidWalletAddress,
@@ -84,9 +84,32 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
+    const sourceTxHash = body.sourceTxHash;
+
+    if (!sourceTxHash || typeof sourceTxHash !== "string") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "source_tx_hash_required",
+          message: "sourceTxHash is required to bind the bridge to your wallet.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const sourceVerification = await verifyBaseSwapTx({
+      txHash: sourceTxHash,
+      walletAddress,
+    });
+    if (!sourceVerification.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: sourceVerification.error,
+          message: sourceVerification.message,
+        },
+        { status: 400 },
+      );
     }
 
     const verification = await verifyBaseDestinationTx({

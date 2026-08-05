@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import {
   extractSupabaseError,
   saveDeployedContract,
@@ -80,7 +79,7 @@ async function verifyDeployTxWithRetry(params: {
 /**
  * POST /api/contracts/save
  * Persists a deployed contract using the service-role admin client.
- * Requires wallet ownership (+ tx from wallet when txHash provided).
+ * Requires a verified Base deploy tx from the claimed wallet.
  */
 export async function POST(request: Request) {
   try {
@@ -114,7 +113,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (txHash && !isTxHash(txHash)) {
+    if (!txHash || !isTxHash(txHash)) {
       return NextResponse.json(
         { success: false, error: "valid_tx_hash_required" },
         { status: 400 },
@@ -141,40 +140,33 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
-    }
-
-    if (txHash) {
-      const verification = await verifyDeployTxWithRetry({
-        txHash,
+    const verification = await verifyDeployTxWithRetry({
+      txHash,
+      walletAddress,
+    });
+    if (!verification.ok) {
+      console.error("[api/contracts/save] tx verification failed", {
         walletAddress,
+        txHash,
+        contractAddress,
+        error: verification.error,
+        message: verification.message,
       });
-      if (!verification.ok) {
-        console.error("[api/contracts/save] tx verification failed", {
-          walletAddress,
-          txHash,
-          contractAddress,
+      return NextResponse.json(
+        {
+          success: false,
           error: verification.error,
           message: verification.message,
-        });
-        return NextResponse.json(
-          {
-            success: false,
-            error: verification.error,
-            message: verification.message,
-          },
-          { status: 400 },
-        );
-      }
+        },
+        { status: 400 },
+      );
     }
 
     const row = await saveDeployedContract({
       walletAddress,
       templateId,
       contractAddress,
-      txHash: txHash ?? null,
+      txHash,
       chainId,
     });
 

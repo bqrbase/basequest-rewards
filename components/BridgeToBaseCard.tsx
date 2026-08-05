@@ -5,7 +5,6 @@ import GlassPanel from "@/components/GlassPanel";
 import QuestCompletedToast, {
   type QuestCompletedToastData,
 } from "@/components/QuestCompletedToast";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { requestQuestCompletion } from "@/lib/quests/requestQuestCompletion";
 import type { QuestProgress } from "@/lib/quest-engine";
 import {
@@ -86,7 +85,6 @@ export default function BridgeToBaseCard({
   const config = useConfig();
   const { address, status: walletStatus } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  const { ensureWalletAuth } = useWalletAuth();
   const abortRef = useRef<AbortController | null>(null);
 
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
@@ -248,7 +246,6 @@ export default function BridgeToBaseCard({
         destinationChainId: completed.destinationChainId,
         sourceTxHash: completed.sourceTxHash,
       },
-      ensureAuth: ensureWalletAuth,
     });
 
     if (!result.success || !result.progress) {

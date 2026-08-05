@@ -1,7 +1,6 @@
 "use client";
 
 import { FarcasterIcon } from "@/components/icons/SocialIcons";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { FARCASTER_FOLLOW_QUEST_TARGET } from "@/lib/community-quests";
 import { ui } from "@/lib/ui-styles";
 import type { QuestProgress, QuestStatus } from "@/lib/quest-engine";
@@ -61,7 +60,6 @@ export default function FollowFarcasterQuestButton({
   onCompleted,
 }: FollowFarcasterQuestButtonProps) {
   const { address, status: walletStatus } = useAccount();
-  const { ensureWalletAuth } = useWalletAuth();
   const isWalletConnected = walletStatus === "connected" && Boolean(address);
   const [isVerifying, setIsVerifying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -105,16 +103,6 @@ export default function FollowFarcasterQuestButton({
     setErrorMessage(null);
 
     try {
-      const auth = await ensureWalletAuth();
-      if (!auth.ok) {
-        setErrorMessage(
-          auth.error === "wallet_not_connected"
-            ? "Connect your wallet to verify."
-            : "Sign the wallet ownership message to continue.",
-        );
-        return;
-      }
-
       const fid = await readConnectedFid();
 
       const response = await fetch("/api/auth/farcaster/verify-follow", {

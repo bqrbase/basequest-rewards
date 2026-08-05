@@ -3,7 +3,6 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { enforceWalletOwnership } from "@/lib/quests/enforceWalletOwnership";
 import { saveXFollowVerification } from "@/lib/supabase/users";
 import { loadProgressAdmin } from "@/lib/supabase/usersServer";
 import {
@@ -22,7 +21,7 @@ type VerifyBody = {
 
 /**
  * POST /api/auth/x/verify-follow
- * Requires wallet ownership + X OAuth session bound to the same wallet.
+ * Requires X OAuth session bound to the same wallet (no wallet signature session).
  */
 export async function POST(request: Request) {
   try {
@@ -42,11 +41,6 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const ownership = await enforceWalletOwnership(walletAddress);
-    if (!ownership.ok) {
-      return ownership.response;
-    }
-
     const progressBefore = await loadProgressAdmin(walletAddress);
 
     // One-time quest: keep completed even if user later unfollows.

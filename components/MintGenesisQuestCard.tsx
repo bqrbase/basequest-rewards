@@ -2,7 +2,6 @@
 
 import QuestCard from "@/components/QuestCard";
 import { useGenesisHolder } from "@/hooks/useGenesisHolder";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { requestQuestCompletion } from "@/lib/quests/requestQuestCompletion";
 import type {
   QuestProgress,
@@ -30,7 +29,6 @@ export default function MintGenesisQuestCard({
   const router = useRouter();
   const { address, status: walletStatus } = useAccount();
   const { isGenesisHolder, loading: holderLoading } = useGenesisHolder();
-  const { ensureWalletAuth } = useWalletAuth();
   const [isClaiming, setIsClaiming] = useState(false);
 
   const status: QuestStatus = quest?.status ?? "available";
@@ -67,7 +65,6 @@ export default function MintGenesisQuestCard({
       const result = await requestQuestCompletion({
         endpoint: "/api/quests/mint-genesis/complete",
         body: { wallet: address },
-        ensureAuth: ensureWalletAuth,
       });
 
       if (!result.success || !result.progress) {

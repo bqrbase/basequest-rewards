@@ -19,7 +19,6 @@ import { completeReferralClient } from "@/lib/referrals/client";
 import { REFERRAL_ONBOARDING_QUEST_ID } from "@/lib/referrals/constants";
 import { fetchQuests } from "@/lib/supabase/quests";
 import { fetchUser, userRowToProgress } from "@/lib/supabase/users";
-import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { calculateGenesisXP } from "@/lib/genesis/xp";
 import { useGenesisAccess } from "@/hooks/useGenesisAccess";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -50,7 +49,6 @@ function cacheProgressLocally(
 }
 
 const SERVER_OWNED_QUESTS = new Set<QuestId>([
-  "daily-check-in",
   "view-leaderboard",
   "build-streak",
   "explore-base",
@@ -101,7 +99,6 @@ export function useQuestEngine() {
   const [progressReady, setProgressReady] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState<number | null>(null);
   const { address, status: walletStatus } = useAccount();
-  const { ensureWalletAuth, hasWalletAuthSession } = useWalletAuth();
   const { canReceiveGenesisXPBonus } = useGenesisAccess();
   const isWalletConnected = walletStatus === "connected";
   const isWalletReconnecting =
@@ -168,29 +165,21 @@ export function useQuestEngine() {
     let cancelled = false;
 
     /**
-     * Soft hydrate on connect — never prompts for a signature.
-     * Uses an existing session if present; otherwise public read / local cache.
+     * Soft hydrate on connect — sync server progress, then public read / local cache.
      */
-    async function hydrateProgressWithoutAuth() {
+    async function hydrateProgress() {
       try {
-        const hasSession = await hasWalletAuthSession();
+        const serverProgress = await syncProgressFromServer(walletAddress);
         if (cancelled) {
           return;
         }
-
-        if (hasSession) {
-          const serverProgress = await syncProgressFromServer(walletAddress);
-          if (cancelled) {
-            return;
-          }
-          if (serverProgress) {
-            const next = normalizeStreak(serverProgress);
-            setProgress(next);
-            setProgressReady(true);
-            cacheProgressLocally(next, storageWalletAddress);
-            maybeCompleteReferral(walletAddress, next);
-            return;
-          }
+        if (serverProgress) {
+          const next = normalizeStreak(serverProgress);
+          setProgress(next);
+          setProgressReady(true);
+          cacheProgressLocally(next, storageWalletAddress);
+          maybeCompleteReferral(walletAddress, next);
+          return;
         }
 
         const user = await fetchUser(walletAddress);
@@ -211,10 +200,7 @@ export function useQuestEngine() {
         setProgressReady(true);
         cacheProgressLocally(fallback, storageWalletAddress);
       } catch (error) {
-        console.error(
-          "[useQuestEngine] hydrateProgressWithoutAuth failed",
-          error,
-        );
+        console.error("[useQuestEngine] hydrateProgress failed", error);
         if (cancelled) {
           return;
         }
@@ -226,18 +212,12 @@ export function useQuestEngine() {
       }
     }
 
-    void hydrateProgressWithoutAuth();
+    void hydrateProgress();
 
     return () => {
       cancelled = true;
     };
-  }, [
-    hydrated,
-    address,
-    isWalletConnected,
-    storageWalletAddress,
-    hasWalletAuthSession,
-  ]);
+  }, [hydrated, address, isWalletConnected, storageWalletAddress]);
 
   const applyLocalProgress = useCallback(
     (nextProgress: QuestProgress) => {
@@ -296,12 +276,6 @@ export function useQuestEngine() {
         }
 
         void (async () => {
-          const auth = await ensureWalletAuth();
-          if (!auth.ok) {
-            rollbackOptimistic();
-            return;
-          }
-
           const serverProgress = await completeQuestOnServer({
             wallet: address,
             questId,
@@ -330,7 +304,6 @@ export function useQuestEngine() {
       address,
       applyLocalProgress,
       canReceiveGenesisXPBonus,
-      ensureWalletAuth,
       isWalletConnected,
       progress,
       questDefinitions,
