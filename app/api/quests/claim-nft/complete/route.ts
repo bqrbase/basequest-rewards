@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import {
+  BADGE_CLAIM_SELECTOR,
+  getBadgeContractAddress,
+} from "@/lib/chain/questContracts";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
+import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import { loadProgressAdmin } from "@/lib/supabase/usersServer";
 import {
@@ -53,10 +57,24 @@ export async function POST(request: Request) {
       );
     }
 
+    const badgeAddress = getBadgeContractAddress();
+    if (!badgeAddress) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "badge_contract_unconfigured",
+          message: "Badge contract address is not configured.",
+        },
+        { status: 503 },
+      );
+    }
+
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseSwapTx({
+    const verification = await verifyBaseTransactionWithRetry({
       txHash,
       walletAddress,
+      expectedTo: badgeAddress,
+      expectedFunctionSelector: BADGE_CLAIM_SELECTOR,
     });
     if (!verification.ok) {
       return NextResponse.json(

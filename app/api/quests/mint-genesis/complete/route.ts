@@ -18,7 +18,8 @@ type CompleteBody = {
 /**
  * POST /api/quests/mint-genesis/complete
  * Requires on-chain Genesis ERC-1155 balanceOf(address, 1) > 0.
- * Awards XP once via awardOneTimeQuest (no signature session).
+ * Mint is owner-executed, so XP uses holder verification rather than a
+ * user-sent mint transaction. No signature session.
  */
 export async function POST(request: Request) {
   try {

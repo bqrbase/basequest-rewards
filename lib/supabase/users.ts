@@ -27,7 +27,8 @@ import { logSupabaseError } from "@/lib/supabase/errors";
  * );
  *
  * SECURITY: anon clients may SELECT only (RLS). All XP writes go through
- * service-role helpers in lib/supabase/usersServer.ts after wallet ownership.
+ * service-role helpers in lib/supabase/usersServer.ts after server-side
+ * transaction (or Genesis holder) verification.
  */
 export type UserRow = {
   id: string;
@@ -66,7 +67,7 @@ export function progressToUserUpdate(progress: QuestProgress) {
 
 /**
  * Read-only fetch. Does not create rows (RLS blocks anon insert).
- * Prefer POST /api/progress/sync after wallet ownership for authoritative state.
+ * Prefer POST /api/progress/sync for authoritative state (wallet address only).
  */
 export async function fetchUser(
   walletAddress: string,

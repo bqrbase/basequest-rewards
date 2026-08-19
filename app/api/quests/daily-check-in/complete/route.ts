@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { toFunctionSelector } from "viem";
 import { DAILY_CHECK_IN_ADDRESS } from "@/lib/contracts/DailyCheckIn";
+import { CHECK_IN_SELECTOR } from "@/lib/chain/questContracts";
 import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import {
   awardOneTimeQuest,
@@ -15,8 +15,6 @@ type CompleteBody = {
   wallet?: string;
   txHash?: string;
 };
-
-const CHECK_IN_SELECTOR = toFunctionSelector("checkIn()");
 
 /**
  * POST /api/quests/daily-check-in/complete

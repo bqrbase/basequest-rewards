@@ -1,6 +1,5 @@
 export type WalletErrorCode =
   | "WALLET_NOT_CONNECTED"
-  | "AUTHENTICATION_FAILED"
   | "WRONG_CHAIN"
   | "PROVIDER_UNAVAILABLE"
   | "METHOD_UNSUPPORTED"
@@ -94,8 +93,6 @@ export function walletErrorToUserMessage(error: unknown): string {
   switch (walletError.code) {
     case "WALLET_NOT_CONNECTED":
       return "Connect your wallet to continue.";
-    case "AUTHENTICATION_FAILED":
-      return "Sign the wallet ownership message to continue.";
     case "WRONG_CHAIN":
     case "SWITCH_REJECTED":
       return "Please switch your wallet to Base Mainnet.";

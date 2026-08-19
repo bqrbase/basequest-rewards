@@ -64,8 +64,9 @@ export default function PrivacyPage() {
       <StaticSection title="Cookies">
         <p>
           BaseQuest may use cookies or similar storage mechanisms for essential
-          app functionality, such as wallet ownership sessions, authentication
-          state, and preferences that keep the product secure and usable.
+          app functionality, such as X (Twitter) OAuth when you choose to connect
+          X, and preferences that keep the product usable. Connecting a wallet
+          does not create an ownership signature or authentication cookie.
         </p>
         <p>
           These mechanisms are used to operate the service, not to sell personal

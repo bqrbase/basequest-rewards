@@ -3,7 +3,7 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
   isValidWalletAddress,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseSwapTx({
+    const verification = await verifyBaseTransactionWithRetry({
       txHash,
       walletAddress,
     });

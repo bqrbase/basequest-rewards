@@ -3,7 +3,11 @@ import {
   extractSupabaseError,
   saveClaimedNft,
 } from "@/lib/supabase/claimedNfts";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
+import {
+  BADGE_CLAIM_SELECTOR,
+  getBadgeContractAddress,
+} from "@/lib/chain/questContracts";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -93,10 +97,35 @@ export async function POST(request: Request) {
       );
     }
 
+    const badgeAddress = getBadgeContractAddress();
+    if (!badgeAddress) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "badge_contract_unconfigured",
+          message: "Badge contract address is not configured.",
+        },
+        { status: 503 },
+      );
+    }
+
+    if (contractAddress.toLowerCase() !== badgeAddress.toLowerCase()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "contract_mismatch",
+          message: "Claim contract address does not match the Badge contract.",
+        },
+        { status: 400 },
+      );
+    }
+
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseSwapTx({
+    const verification = await verifyBaseTransactionWithRetry({
       txHash,
       walletAddress,
+      expectedTo: badgeAddress,
+      expectedFunctionSelector: BADGE_CLAIM_SELECTOR,
     });
     if (!verification.ok) {
       return NextResponse.json(

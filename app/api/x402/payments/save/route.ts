@@ -3,7 +3,7 @@ import {
   extractSupabaseError,
   saveX402Payment,
 } from "@/lib/supabase/x402Payments";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseSwapTx({
+    const verification = await verifyBaseTransactionWithRetry({
       txHash,
       walletAddress,
     });

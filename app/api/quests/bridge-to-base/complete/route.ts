@@ -5,7 +5,7 @@ import {
 } from "@/lib/quests/awardOneTimeQuest";
 import { LIFI_BASE_CHAIN_ID } from "@/lib/swap/lifi";
 import { verifyBaseDestinationTx } from "@/lib/swap/verifyBaseDestinationTx";
-import { verifyBaseSwapTx } from "@/lib/swap/verifyBaseSwapTx";
+import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
   isValidWalletAddress,
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const sourceVerification = await verifyBaseSwapTx({
+    const sourceVerification = await verifyBaseTransactionWithRetry({
       txHash: sourceTxHash,
       walletAddress,
     });

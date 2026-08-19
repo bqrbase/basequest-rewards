@@ -14,8 +14,8 @@ type ConnectWalletButtonProps = {
 };
 
 /**
- * Connect entry point — wallet layer only (phase 1).
- * No direct connector selection or wagmi connect() in this component.
+ * Connect Wallet — host-aware connect only.
+ * Never requests a signature or ownership session.
  */
 export default function ConnectWalletButton({
   connectLabel = "Connect Wallet",

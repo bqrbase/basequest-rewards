@@ -3,30 +3,40 @@
 ## Goals
 
 One production wallet layer for Browser, Base App, and Farcaster Mini App.
-Components and domain modules never talk to wagmi/providers directly for
-connect, auth, chain, or write operations.
+Connecting a wallet never requests a signature. XP and quest completion are
+awarded only after the server verifies an on-chain transaction (or, for Genesis,
+an on-chain holder balance).
 
-## Non-goals
+## Auth (removed)
 
-UI, styling, quest/XP/rewards/referral business logic, Supabase schema,
-and smart contracts stay unchanged. Existing hook and API route contracts
-remain stable as façades.
+Wallet ownership signatures, SIWE / `personal_sign` sessions, authentication
+cookies, `Authentication.ts`, `Signer.ts`, `WalletAuthLifecycle`,
+`ensureSessionClient`, and `/api/auth/wallet/*` are gone.
 
-## Phased migration (main)
+Connect Wallet only connects.
 
-Ship and verify on main one slice at a time. Each phase is an independently
-deployable, reversible commit.
+## Quest / XP proof
 
-| Phase | Scope | Status |
-|-------|--------|--------|
-| 0 | Add `lib/wallet/*` engine (unused by call sites) | done |
-| 1 | Connect Wallet + Authentication only | active |
-| 2 | Daily Check-in (`executeCalls`) | pending |
-| 3 | Deploy Contract | pending |
-| 4 | Remaining writes (badge, rewards, genesis, swap, bridge, x402) | pending |
+After a successful write, the client sends `{ wallet, txHash }` to a dedicated
+complete endpoint. The server verifies via `lib/chain/verifyBaseTransaction.ts`:
 
-Do not migrate later phases until the previous phase is verified in Browser,
-Base App, and Farcaster.
+1. Transaction exists on Base
+2. Sender matches the connected wallet
+3. Expected contract (when applicable)
+4. Expected function selector (when applicable)
+5. Receipt status is success
+
+Only then does the service-role path update Supabase and award XP.
+
+| Flow | Proof |
+|------|--------|
+| Daily Check-in | `checkIn()` on DailyCheckIn |
+| Deploy Contract | contract-creation tx from wallet |
+| Badge Claim | `claim()` on BaseQuestBadge |
+| First Swap / x402 | sender + success on Base |
+| Bridge | source tx from wallet + Base destination receipt |
+| Genesis XP | on-chain `balanceOf` (mint is owner-executed) |
+| Rewards Claim | on-chain `isClaimed` after `claim()` (no XP) |
 
 ## Layout
 
@@ -36,42 +46,20 @@ lib/wallet/
   index.ts
   types.ts / constants.ts / Errors.ts / logger.ts
   ConnectorResolver.ts / ProviderResolver.ts / ChainManager.ts
-  Signer.ts / Authentication.ts / WalletClient.ts
-  TransactionManager.ts / WalletManager.ts / WalletHostContext.tsx
-  resolveHostFromConfig.ts
-  auth/                    ← server cookie/HMAC (unchanged HTTP contract)
-  ensureBaseMainnet.ts     ← existing call-site API (façade in later phases)
-  getPreferredConnector.ts ← existing call-site API (façade in phase 1)
+  WalletClient.ts / TransactionManager.ts / WalletManager.ts
+  WalletHostContext.tsx / resolveHostFromConfig.ts
+  ensureBaseMainnet.ts / getPreferredConnector.ts
+
+lib/chain/
+  verifyBaseTransaction.ts
+  questContracts.ts
 ```
 
-## Host rules (target)
-
-| Host | Registered connectors | Preferred |
-|------|----------------------|-----------|
-| Browser | injected, coinbaseWallet, walletConnect | last-used → injected → Coinbase → WC |
-| Base App | **baseAccount only** (when verified with connect) | baseAccount |
-| Farcaster | **farcasterMiniApp only** (already on main) | farcaster |
-
-## Auth
-
-Connect remains signature-free. Privileged writes call
-`Authentication.requireAuthSession` once those flows migrate (phase 2+).
-Session cookies and `/api/auth/wallet/*` stay unchanged.
-
-## Transaction pipeline (used from phase 2+)
+## Transaction pipeline
 
 1. Require connected address
-2. Ensure auth session (when required)
-3. Ensure required chain
-4. Resolve provider + capabilities
-5. Prefer `wallet_sendCalls` → else `eth_sendTransaction` / `writeContract`
-6. Wait for receipt
-7. Return `WalletTxResult` or typed `WalletError`
-
-## Façades (must keep working)
-
-- `useWalletAuth` / `ensureWalletAuthSession`
-- `useEnsureBaseMainnet` / `ensureBaseMainnet`
-- `useWalletDisconnect`
-- `getPreferredConnector`
-- `/api/auth/wallet/*`
+2. Ensure required chain
+3. Resolve provider + capabilities
+4. Prefer `wallet_sendCalls` → else `eth_sendTransaction` / `writeContract`
+5. Wait for receipt
+6. Client posts txHash; server verifies; XP awarded
