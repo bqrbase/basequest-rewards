@@ -44,6 +44,7 @@ export {
   executeCalls,
   executeWriteContract,
   executeDeployContract,
+  collectDeployWalletDiagnostics,
 } from "@/lib/wallet/TransactionManager";
 
 export {

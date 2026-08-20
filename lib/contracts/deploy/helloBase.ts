@@ -2,9 +2,14 @@ import {
   HELLO_BASE_ABI,
   HELLO_BASE_BYTECODE,
 } from "@/lib/contracts/abi/HelloBase";
+import {
+  collectDeployWalletDiagnostics,
+  executeDeployContract,
+} from "@/lib/wallet/TransactionManager";
+import { resolveHostFromConfig } from "@/lib/wallet/resolveHostFromConfig";
+import { walletLogger } from "@/lib/wallet/logger";
 import { base } from "viem/chains";
 import type { Config } from "wagmi";
-import { deployContract, waitForTransactionReceipt } from "wagmi/actions";
 import type { Address, Hash, Hex } from "viem";
 
 export type HelloBaseDeployParams = {
@@ -73,19 +78,24 @@ export async function deployHelloBase(
   }
 
   try {
-    const hash = await deployContract(params.config, {
+    const host = resolveHostFromConfig(params.config);
+    const diagnostics = await collectDeployWalletDiagnostics({
+      config: params.config,
+      host,
+      chainId,
+    });
+    walletLogger.debug("deployHelloBase-diagnostics", diagnostics);
+
+    const result = await executeDeployContract({
+      config: params.config,
+      host,
+      chainId,
       abi: HELLO_BASE_ABI,
       bytecode: HELLO_BASE_BYTECODE,
-      chainId,
       ...(params.dataSuffix ? { dataSuffix: params.dataSuffix } : {}),
     });
 
-    const receipt = await waitForTransactionReceipt(params.config, {
-      hash,
-      confirmations: 1,
-    });
-
-    const contractAddress = receipt.contractAddress;
+    const contractAddress = result.contractAddress;
     if (!contractAddress) {
       return {
         ok: false,
@@ -94,19 +104,11 @@ export async function deployHelloBase(
       };
     }
 
-    if (receipt.status !== "success") {
-      return {
-        ok: false,
-        status: "error",
-        message: "Deployment transaction reverted.",
-      };
-    }
-
     return {
       ok: true,
       status: "deployed",
       contractAddress,
-      txHash: hash,
+      txHash: result.hash as Hash,
       chainId,
     };
   } catch (error) {

@@ -3,12 +3,15 @@ import {
   type Address,
   type Hash,
   type Hex,
+  concat,
+  encodeDeployData,
   encodeFunctionData,
   numberToHex,
 } from "viem";
 import type { Config } from "wagmi";
 import {
   deployContract,
+  getAccount,
   waitForTransactionReceipt,
   writeContract,
 } from "wagmi/actions";
@@ -29,6 +32,7 @@ import { resolveProviderSnapshot } from "@/lib/wallet/ProviderResolver";
 import type { WalletHost } from "@/lib/wagmi";
 import {
   getHostWalletRequestClient,
+  getHostWalletClient,
   requireConnectedAddress,
 } from "@/lib/wallet/WalletClient";
 import type {
@@ -401,6 +405,92 @@ export type DeployContractParams = {
   dataSuffix?: Hex;
 };
 
+export type DeployWalletDiagnostics = {
+  host: WalletHost;
+  activeConnectorId: string | null;
+  activeConnectorType: string | null;
+  connectedAddress: Address | null;
+  chainId: number;
+  walletClientChainName: string | undefined;
+  walletClientChainId: number | undefined;
+  walletClientAccount: Address | undefined;
+};
+
+/** Temporary diagnostics for mini-app deploy failures (no secrets). */
+export async function collectDeployWalletDiagnostics(params: {
+  config: Config;
+  host: WalletHost;
+  chainId: number;
+}): Promise<DeployWalletDiagnostics> {
+  const account = getAccount(params.config);
+  let walletClientChainName: string | undefined;
+  let walletClientChainId: number | undefined;
+  let walletClientAccount: Address | undefined;
+
+  try {
+    const walletClient = await getHostWalletClient({
+      config: params.config,
+      chainId: params.chainId,
+    });
+    walletClientChainName = walletClient.chain?.name;
+    walletClientChainId = walletClient.chain?.id;
+    walletClientAccount = walletClient.account?.address;
+  } catch {
+    // diagnostics only
+  }
+
+  return {
+    host: params.host,
+    activeConnectorId: account.connector?.id ?? null,
+    activeConnectorType: account.connector?.type ?? null,
+    connectedAddress: account.address ?? null,
+    chainId: params.chainId,
+    walletClientChainName,
+    walletClientChainId,
+    walletClientAccount,
+  };
+}
+
+/**
+ * Farcaster mini-app providers (incl. external Rainbow via host proxy) reject
+ * wagmi/viem deployContract because formatted eth_sendTransaction includes
+ * chainId. Match Daily Check-in: omit chainId from the RPC params.
+ */
+async function deployContractViaMiniAppProvider(params: {
+  config: Config;
+  chainId: number;
+  abi: Abi;
+  bytecode: Hex;
+  args?: readonly unknown[];
+  dataSuffix?: Hex;
+}): Promise<Hash> {
+  const client = await getHostWalletRequestClient({
+    config: params.config,
+    chainId: params.chainId,
+  });
+  const from =
+    client.account?.address ?? requireConnectedAddress(params.config);
+
+  const calldata = encodeDeployData({
+    abi: params.abi,
+    bytecode: params.bytecode,
+    args: params.args as never,
+  });
+  const data = params.dataSuffix
+    ? concat([calldata, params.dataSuffix])
+    : calldata;
+
+  return (await client.request({
+    method: "eth_sendTransaction",
+    params: [
+      {
+        from,
+        data,
+      },
+    ],
+  })) as Hash;
+}
+
 export async function executeDeployContract(
   params: DeployContractParams,
 ): Promise<WalletTxResult & { contractAddress?: Address }> {
@@ -411,19 +501,44 @@ export async function executeDeployContract(
     chainId: params.chainId ?? WALLET_REQUIRED_CHAIN_ID,
   });
 
-  try {
-    const hash = await deployContract(params.config, {
-      abi: params.abi,
-      bytecode: params.bytecode,
-      args: params.args as never,
+  walletLogger.debug(
+    "deploy-diagnostics",
+    await collectDeployWalletDiagnostics({
+      config: params.config,
+      host: params.host,
       chainId,
-      ...(params.dataSuffix ? { dataSuffix: params.dataSuffix } : {}),
-    });
+    }),
+  );
+
+  try {
+    const hash =
+      params.host === "farcaster"
+        ? await deployContractViaMiniAppProvider({
+            config: params.config,
+            chainId,
+            abi: params.abi,
+            bytecode: params.bytecode,
+            args: params.args,
+            dataSuffix: params.dataSuffix,
+          })
+        : await deployContract(params.config, {
+            abi: params.abi,
+            bytecode: params.bytecode,
+            args: params.args as never,
+            chainId,
+            ...(params.dataSuffix ? { dataSuffix: params.dataSuffix } : {}),
+          });
     const receipt = await waitForTransactionReceipt(params.config, {
       hash,
       confirmations: 1,
       chainId,
     });
+    if (receipt.status !== "success") {
+      throw new WalletError(
+        "TRANSACTION_FAILED",
+        "Deployment transaction reverted.",
+      );
+    }
     return {
       hash,
       callsId: null,
