@@ -3,7 +3,6 @@ import {
   type Address,
   type Hash,
   type Hex,
-  concat,
   encodeDeployData,
   encodeFunctionData,
   numberToHex,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/wallet/constants";
 import {
   WalletError,
+  extractProviderRejection,
   isMethodUnsupportedError,
   isUserRejectedError,
   toWalletError,
@@ -31,6 +31,7 @@ import { walletLogger } from "@/lib/wallet/logger";
 import { resolveProviderSnapshot } from "@/lib/wallet/ProviderResolver";
 import type { WalletHost } from "@/lib/wagmi";
 import {
+  getActiveConnector,
   getHostWalletRequestClient,
   getHostWalletClient,
   requireConnectedAddress,
@@ -451,10 +452,68 @@ export async function collectDeployWalletDiagnostics(params: {
   };
 }
 
+type FarcasterHostRpc = {
+  ethProviderRequestV2?: (request: unknown) => Promise<unknown>;
+  ethProviderRequest?: (request: unknown) => Promise<unknown>;
+};
+
+type HostRpcError = {
+  code?: number;
+  message?: string;
+  details?: unknown;
+  data?: unknown;
+};
+
+function inspectHexPayload(data: Hex) {
+  const body = data.startsWith("0x") ? data.slice(2) : data;
+  return {
+    startsWith0x: data.startsWith("0x"),
+    empty: body.length === 0,
+    evenHex: body.length % 2 === 0,
+    byteLength: Math.floor(body.length / 2),
+    prefix: data.slice(0, 10),
+  };
+}
+
+function snapshotSendTransaction(tx: Record<string, unknown>) {
+  const data = typeof tx.data === "string" ? (tx.data as Hex) : undefined;
+  return {
+    method: "eth_sendTransaction",
+    paramKeys: Object.keys(tx),
+    from: tx.from ?? null,
+    hasTo: Object.prototype.hasOwnProperty.call(tx, "to"),
+    to: tx.to ?? null,
+    hasValue: Object.prototype.hasOwnProperty.call(tx, "value"),
+    value: tx.value ?? null,
+    hasGas: Object.prototype.hasOwnProperty.call(tx, "gas"),
+    hasGasLimit: Object.prototype.hasOwnProperty.call(tx, "gasLimit"),
+    hasChainId: Object.prototype.hasOwnProperty.call(tx, "chainId"),
+    data: data ? inspectHexPayload(data) : null,
+  };
+}
+
+function formatHostRpcError(error: HostRpcError): string {
+  const parts = [
+    typeof error.code === "number" ? `code=${error.code}` : null,
+    typeof error.message === "string" && error.message
+      ? `message=${error.message}`
+      : null,
+    typeof error.details === "string" && error.details
+      ? `details=${error.details}`
+      : null,
+  ].filter(Boolean);
+  return parts.length > 0
+    ? `Farcaster host rejected eth_sendTransaction (${parts.join(", ")})`
+    : "Farcaster host rejected eth_sendTransaction with an empty error payload.";
+}
+
 /**
- * Farcaster mini-app providers (incl. external Rainbow via host proxy) reject
- * wagmi/viem deployContract because formatted eth_sendTransaction includes
- * chainId. Match Daily Check-in: omit chainId from the RPC params.
+ * Farcaster deploy must hit MiniAppSDK.wallet.ethProvider (host → Rainbow).
+ * Call ethProviderRequestV2 directly so we capture the host's { code, message, data }
+ * before the SDK maps missing `details` to "Unknown provider RPC error".
+ *
+ * Match Daily Check-in fallback: { from, data } only — no chainId, gas, or
+ * ERC-8021 suffix concatenated into CREATE initcode.
  */
 async function deployContractViaMiniAppProvider(params: {
   config: Config;
@@ -464,31 +523,166 @@ async function deployContractViaMiniAppProvider(params: {
   args?: readonly unknown[];
   dataSuffix?: Hex;
 }): Promise<Hash> {
-  const client = await getHostWalletRequestClient({
-    config: params.config,
-    chainId: params.chainId,
-  });
-  const from =
-    client.account?.address ?? requireConnectedAddress(params.config);
+  const account = getAccount(params.config);
+  const connector = getActiveConnector(params.config) ?? account.connector;
+  const from = account.address ?? requireConnectedAddress(params.config);
 
-  const calldata = encodeDeployData({
+  const bytecodeInfo = inspectHexPayload(params.bytecode);
+  if (
+    !bytecodeInfo.startsWith0x ||
+    bytecodeInfo.empty ||
+    !bytecodeInfo.evenHex
+  ) {
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      "HelloBase bytecode is not valid hex.",
+    );
+  }
+
+  const data = encodeDeployData({
     abi: params.abi,
     bytecode: params.bytecode,
     args: params.args as never,
   });
-  const data = params.dataSuffix
-    ? concat([calldata, params.dataSuffix])
-    : calldata;
 
-  return (await client.request({
+  const tx = {
+    from,
+    data,
+  };
+
+  let providerType: string | null = null;
+  try {
+    const provider = (await connector?.getProvider({
+      chainId: params.chainId,
+    })) as { constructor?: { name?: string } } | undefined;
+    providerType = provider?.constructor?.name ?? typeof provider;
+  } catch {
+    providerType = null;
+  }
+
+  walletLogger.error("farcaster-deploy-rpc", {
+    activeConnectorId: connector?.id ?? null,
+    activeConnectorType: connector?.type ?? null,
+    connectedAddress: account.address ?? null,
+    chainId: params.chainId,
+    providerType,
+    constructorArgs: params.args?.length ?? 0,
+    dataSuffixOmitted: true,
+    dataSuffixBytes: params.dataSuffix
+      ? inspectHexPayload(params.dataSuffix).byteLength
+      : 0,
+    bytecode: bytecodeInfo,
+    encodedEqualsBytecode: data === params.bytecode,
+    request: snapshotSendTransaction(tx),
+  });
+
+  const jsonRpcRequest = {
+    jsonrpc: "2.0" as const,
+    id: Date.now(),
     method: "eth_sendTransaction",
-    params: [
-      {
-        from,
-        data,
-      },
-    ],
-  })) as Hash;
+    params: [tx],
+  };
+
+  const { miniAppHost } = (await import("@farcaster/miniapp-sdk")) as {
+    miniAppHost?: FarcasterHostRpc;
+  };
+  const host = miniAppHost;
+
+  if (host?.ethProviderRequestV2 || host?.ethProviderRequest) {
+    let raw: unknown;
+    try {
+      raw = host.ethProviderRequestV2
+        ? await host.ethProviderRequestV2(jsonRpcRequest)
+        : await host.ethProviderRequest?.(jsonRpcRequest);
+    } catch (error) {
+      walletLogger.error("farcaster-host-rpc-throw", {
+        rejection: extractProviderRejection(error),
+      });
+      const layers = extractProviderRejection(error).layers;
+      const hostLayer = layers[0];
+      throw new WalletError(
+        "TRANSACTION_FAILED",
+        formatHostRpcError({
+          code: typeof hostLayer?.code === "number" ? hostLayer.code : undefined,
+          message: hostLayer?.message,
+          details: hostLayer?.details,
+          data: hostLayer?.data,
+        }),
+        error,
+      );
+    }
+
+    const response =
+      raw && typeof raw === "object"
+        ? (raw as { result?: unknown; error?: HostRpcError })
+        : { result: raw };
+
+    if (response.error) {
+      walletLogger.error("farcaster-host-rpc-error", {
+        code: response.error.code ?? null,
+        message: response.error.message ?? null,
+        details: response.error.details ?? null,
+        data: response.error.data ?? null,
+        keys: Object.keys(response.error),
+      });
+      throw new WalletError(
+        "TRANSACTION_FAILED",
+        formatHostRpcError(response.error),
+        response.error,
+      );
+    }
+
+    if (typeof response.result !== "string" || !response.result.startsWith("0x")) {
+      throw new WalletError(
+        "TRANSACTION_FAILED",
+        "Farcaster host did not return a transaction hash.",
+        response,
+      );
+    }
+
+    return response.result as Hash;
+  }
+
+  const provider = (await connector?.getProvider({
+    chainId: params.chainId,
+  })) as
+    | {
+        request: (args: {
+          method: string;
+          params?: readonly unknown[];
+        }) => Promise<unknown>;
+      }
+    | undefined;
+
+  if (!provider?.request) {
+    throw new WalletError(
+      "PROVIDER_UNAVAILABLE",
+      "Farcaster wallet provider is unavailable. Reconnect and try again.",
+    );
+  }
+
+  try {
+    return (await provider.request({
+      method: "eth_sendTransaction",
+      params: [tx],
+    })) as Hash;
+  } catch (providerError) {
+    walletLogger.error("farcaster-ethProvider-request-error", {
+      rejection: extractProviderRejection(providerError),
+    });
+    const layers = extractProviderRejection(providerError).layers;
+    const hostLayer = layers[0];
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      formatHostRpcError({
+        code: typeof hostLayer?.code === "number" ? hostLayer.code : undefined,
+        message: hostLayer?.message,
+        details: hostLayer?.details,
+        data: hostLayer?.data,
+      }),
+      providerError,
+    );
+  }
 }
 
 export async function executeDeployContract(

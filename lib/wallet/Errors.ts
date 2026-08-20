@@ -33,6 +33,80 @@ export function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function summarizeForLog(value: unknown, depth = 0): unknown {
+  if (value == null) {
+    return value;
+  }
+  if (typeof value === "string") {
+    if (value.startsWith("0x") && value.length > 22) {
+      return {
+        hexPrefix: value.slice(0, 10),
+        hexBytes: Math.floor((value.length - 2) / 2),
+      };
+    }
+    return value.length > 500 ? `${value.slice(0, 500)}…` : value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value !== "object" || depth > 4) {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 8).map((entry) => summarizeForLog(entry, depth + 1));
+  }
+
+  const record = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(record).slice(0, 24)) {
+    out[key] = summarizeForLog(record[key], depth + 1);
+  }
+  return out;
+}
+
+export type ProviderRejectionLayer = {
+  name?: string;
+  code?: unknown;
+  message?: string;
+  details?: unknown;
+  data?: unknown;
+  shortMessage?: unknown;
+  keys: string[];
+};
+
+/** Walk viem/ox/EIP-1193 error chains without logging bytecode or secrets. */
+export function extractProviderRejection(error: unknown): {
+  layers: ProviderRejectionLayer[];
+} {
+  const layers: ProviderRejectionLayer[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+
+  while (current && !seen.has(current) && layers.length < 8) {
+    seen.add(current);
+    if (typeof current !== "object") {
+      layers.push({ message: String(current), keys: [] });
+      break;
+    }
+
+    const record = current as Record<string, unknown>;
+    layers.push({
+      name: typeof record.name === "string" ? record.name : undefined,
+      code: record.code,
+      message:
+        typeof record.message === "string" ? record.message.slice(0, 500) : undefined,
+      details: summarizeForLog(record.details),
+      data: summarizeForLog(record.data),
+      shortMessage: summarizeForLog(record.shortMessage),
+      keys: Object.keys(record),
+    });
+
+    current = record.cause ?? record.error ?? record.data;
+  }
+
+  return { layers };
+}
+
 export function isUserRejectedError(error: unknown): boolean {
   if (isWalletError(error) && error.code === "USER_REJECTED") {
     return true;

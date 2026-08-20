@@ -7,6 +7,7 @@ import {
   executeDeployContract,
 } from "@/lib/wallet/TransactionManager";
 import { resolveHostFromConfig } from "@/lib/wallet/resolveHostFromConfig";
+import { extractProviderRejection, isWalletError } from "@/lib/wallet/Errors";
 import { walletLogger } from "@/lib/wallet/logger";
 import { base } from "viem/chains";
 import type { Config } from "wagmi";
@@ -51,6 +52,9 @@ export function getBaseScanAddressUrl(
 }
 
 function getErrorMessage(error: unknown): string {
+  if (isWalletError(error) && error.message) {
+    return error.message;
+  }
   if (error instanceof Error && error.message) {
     if (/user rejected|denied|rejected the request/i.test(error.message)) {
       return "Transaction was rejected in your wallet.";
@@ -112,6 +116,9 @@ export async function deployHelloBase(
       chainId,
     };
   } catch (error) {
+    walletLogger.error("deployHelloBase-provider-rejection", {
+      rejection: extractProviderRejection(error),
+    });
     console.error("[deployHelloBase]", error);
     return {
       ok: false,
