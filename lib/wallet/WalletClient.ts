@@ -28,10 +28,12 @@ export async function getHostWalletRequestClient(params: {
   chainId?: number;
   connector?: Connector;
 }): Promise<WalletRequestClient> {
+  const connector =
+    params.connector ?? getAccount(params.config).connector;
   try {
     return (await getConnectorClient(params.config, {
       chainId: params.chainId,
-      connector: params.connector,
+      connector,
     })) as WalletRequestClient;
   } catch (error) {
     throw new WalletError(
@@ -47,9 +49,11 @@ export async function getHostWalletClient(params: {
   chainId?: number;
   account?: Address;
 }) {
+  const accountState = getAccount(params.config);
   const client = await getWalletClient(params.config, {
     chainId: params.chainId,
-    account: params.account,
+    account: params.account ?? accountState.address,
+    connector: accountState.connector,
   });
   if (!client) {
     throw new WalletError(

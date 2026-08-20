@@ -21,7 +21,11 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { useAccount, useConfig } from "wagmi";
-import { getConnectorClient, waitForTransactionReceipt } from "wagmi/actions";
+import {
+  getAccount,
+  getConnectorClient,
+  waitForTransactionReceipt,
+} from "wagmi/actions";
 
 type DailyCheckInQuestButtonProps = {
   ctaLabel: string;
@@ -169,11 +173,7 @@ export default function DailyCheckInQuestButton({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const completeCheckInOnServer = useCallback(
-    async (txHash: string) => {
-      if (!address) {
-        return;
-      }
-
+    async (txHash: string, sender: string) => {
       onSuccess?.(txHash);
 
       if (!onCompleted) {
@@ -186,7 +186,7 @@ export default function DailyCheckInQuestButton({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            wallet: address,
+            wallet: sender,
             txHash,
           }),
         });
@@ -224,7 +224,7 @@ export default function DailyCheckInQuestButton({
         );
       }
     },
-    [address, onCompleted, onSuccess],
+    [onCompleted, onSuccess],
   );
 
   const handleCheckIn = useCallback(async () => {
@@ -240,8 +240,11 @@ export default function DailyCheckInQuestButton({
     try {
       await ensureBaseMainnetReady();
 
-      const client = (await getConnectorClient(config)) as WalletRequestClient;
-      const from = client.account?.address;
+      const account = getAccount(config);
+      const client = (await getConnectorClient(config, {
+        connector: account.connector,
+      })) as WalletRequestClient;
+      const from = client.account?.address ?? account.address;
       if (!from) {
         throw new Error("Connect your wallet to check in.");
       }
@@ -340,7 +343,7 @@ export default function DailyCheckInQuestButton({
           hash,
           chainId: base.id,
         });
-        await completeCheckInOnServer(hash);
+        await completeCheckInOnServer(hash, from);
         return;
       }
 
@@ -360,7 +363,7 @@ export default function DailyCheckInQuestButton({
         throw new Error("Check-in confirmed but no transaction hash was returned.");
       }
 
-      await completeCheckInOnServer(txHash);
+      await completeCheckInOnServer(txHash, from);
     } catch (error) {
       if (isBaseMainnetSwitchRejected(error)) {
         setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
