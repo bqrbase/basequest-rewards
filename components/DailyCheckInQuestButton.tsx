@@ -11,6 +11,8 @@ import {
   BASE_MAINNET_REQUIRED_MESSAGE,
   isBaseMainnetSwitchRejected,
 } from "@/lib/wallet/ensureBaseMainnet";
+import { walletLogger } from "@/lib/wallet/logger";
+import { useWalletHost } from "@/lib/wallet/WalletHostContext";
 import { useCallback, useState } from "react";
 import {
   encodeFunctionData,
@@ -20,10 +22,11 @@ import {
   type Hex,
 } from "viem";
 import { base } from "viem/chains";
-import { useAccount, useConfig } from "wagmi";
+import { useAccount, useConfig, type Config } from "wagmi";
 import {
   getAccount,
   getConnectorClient,
+  getTransaction,
   waitForTransactionReceipt,
 } from "wagmi/actions";
 
@@ -44,6 +47,7 @@ type WalletRequestClient = {
     params?: readonly unknown[];
   }) => Promise<unknown>;
   account?: { address?: Hex };
+  chain?: { id?: number };
 };
 
 const CHECK_IN_ADDRESS = getAddress(DAILY_CHECK_IN_ADDRESS);
@@ -108,6 +112,48 @@ function isTransactionHash(id: string): boolean {
   return /^0x[a-fA-F0-9]{64}$/.test(id);
 }
 
+async function logBaseAppCheckInConfirmedTx(params: {
+  config: Config;
+  hash: Hash;
+  connectedAddress: Hex | undefined;
+  walletClientAccount: Hex | undefined;
+  connectorId: string | null;
+  chainId: number | null;
+}): Promise<void> {
+  try {
+    const tx = await getTransaction(params.config, {
+      hash: params.hash,
+      chainId: base.id,
+    });
+    const connected = params.connectedAddress?.toLowerCase() ?? null;
+    const clientAccount = params.walletClientAccount?.toLowerCase() ?? null;
+    const txFrom = tx.from.toLowerCase();
+    walletLogger.error("baseapp-checkin-confirmed-tx", {
+      connectedWagmiAddress: params.connectedAddress ?? null,
+      walletClientAccount: params.walletClientAccount ?? null,
+      connectorId: params.connectorId,
+      chainId: params.chainId,
+      txHash: tx.hash,
+      txFrom: tx.from,
+      txTo: tx.to ?? null,
+      txNonce: tx.nonce,
+      connectedMatchesClient:
+        connected && clientAccount ? connected === clientAccount : null,
+      connectedMatchesTxFrom: connected ? connected === txFrom : null,
+      clientMatchesTxFrom: clientAccount ? clientAccount === txFrom : null,
+    });
+  } catch (error) {
+    walletLogger.error("baseapp-checkin-confirmed-tx-unavailable", {
+      hash: params.hash,
+      connectedWagmiAddress: params.connectedAddress ?? null,
+      walletClientAccount: params.walletClientAccount ?? null,
+      connectorId: params.connectorId,
+      chainId: params.chainId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function waitForCallsSuccess(
   client: WalletRequestClient,
   callsId: string,
@@ -168,6 +214,7 @@ export default function DailyCheckInQuestButton({
 }: DailyCheckInQuestButtonProps) {
   const config = useConfig();
   const { address, status: walletStatus } = useAccount();
+  const host = useWalletHost();
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -241,12 +288,25 @@ export default function DailyCheckInQuestButton({
       await ensureBaseMainnetReady();
 
       const account = getAccount(config);
+      const connectedAddress = account.address;
       const client = (await getConnectorClient(config, {
         connector: account.connector,
+        ...(host === "baseApp" && connectedAddress
+          ? { account: connectedAddress, chainId: base.id }
+          : {}),
       })) as WalletRequestClient;
-      const from = client.account?.address ?? account.address;
+      const from = client.account?.address ?? connectedAddress;
       if (!from) {
         throw new Error("Connect your wallet to check in.");
+      }
+
+      if (host === "baseApp") {
+        walletLogger.error("baseapp-checkin-request", {
+          wagmiConnectedAddress: connectedAddress ?? null,
+          connectorId: account.connector?.id ?? null,
+          walletClientAccount: client.account?.address ?? null,
+          walletClientChainId: client.chain?.id ?? null,
+        });
       }
 
       // Clean ABI calldata — builder attribution goes only via capabilities.
@@ -343,6 +403,16 @@ export default function DailyCheckInQuestButton({
           hash,
           chainId: base.id,
         });
+        if (host === "baseApp") {
+          await logBaseAppCheckInConfirmedTx({
+            config,
+            hash,
+            connectedAddress,
+            walletClientAccount: client.account?.address,
+            connectorId: account.connector?.id ?? null,
+            chainId: client.chain?.id ?? base.id,
+          });
+        }
         await completeCheckInOnServer(hash, from);
         return;
       }
@@ -361,6 +431,17 @@ export default function DailyCheckInQuestButton({
 
       if (!txHash) {
         throw new Error("Check-in confirmed but no transaction hash was returned.");
+      }
+
+      if (host === "baseApp") {
+        await logBaseAppCheckInConfirmedTx({
+          config,
+          hash: txHash as Hash,
+          connectedAddress,
+          walletClientAccount: client.account?.address,
+          connectorId: account.connector?.id ?? null,
+          chainId: client.chain?.id ?? base.id,
+        });
       }
 
       await completeCheckInOnServer(txHash, from);
@@ -386,6 +467,7 @@ export default function DailyCheckInQuestButton({
     config,
     disabled,
     ensureBaseMainnetReady,
+    host,
     isSubmitting,
     walletStatus,
   ]);

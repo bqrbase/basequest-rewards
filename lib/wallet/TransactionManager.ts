@@ -3,14 +3,17 @@ import {
   type Address,
   type Hash,
   type Hex,
+  type TransactionReceipt,
   encodeDeployData,
   encodeFunctionData,
+  getContractAddress,
   numberToHex,
 } from "viem";
 import type { Config } from "wagmi";
 import {
   deployContract,
   getAccount,
+  getTransaction,
   waitForTransactionReceipt,
   writeContract,
 } from "wagmi/actions";
@@ -782,6 +785,82 @@ async function deployContractViaMiniAppProvider(params: {
   }
 }
 
+/**
+ * Base App only: recover a missing receipt.contractAddress for a confirmed
+ * CREATE tx. Uses the confirmed transaction's from + nonce. Never CREATE2.
+ */
+async function recoverBaseAppCreateAddress(params: {
+  config: Config;
+  host: WalletHost;
+  chainId: number;
+  hash: Hash;
+  receipt: TransactionReceipt;
+}): Promise<Address> {
+  const walletDiagnostics = await collectDeployWalletDiagnostics({
+    config: params.config,
+    host: params.host,
+    chainId: params.chainId,
+  });
+
+  let tx: {
+    from?: Address;
+    to?: Address | null;
+    nonce?: number;
+  };
+  try {
+    tx = await getTransaction(params.config, {
+      hash: params.hash,
+      chainId: params.chainId,
+    });
+  } catch (error) {
+    walletLogger.error("baseapp-deploy-tx-unavailable", {
+      host: params.host,
+      transactionHash: params.hash,
+      receiptStatus: params.receipt.status,
+      receiptContractAddress: params.receipt.contractAddress ?? null,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      "Deployment confirmed, but the transaction could not be retrieved to recover the contract address.",
+      error,
+    );
+  }
+
+  walletLogger.error("baseapp-deploy-receipt", {
+    host: params.host,
+    activeConnectorId: walletDiagnostics.activeConnectorId,
+    connectedWalletAddress: walletDiagnostics.connectedAddress,
+    walletClientAccount: walletDiagnostics.walletClientAccount,
+    walletClientChainId: walletDiagnostics.walletClientChainId,
+    transactionHash: params.hash,
+    transactionFrom: tx.from ?? null,
+    transactionTo: tx.to ?? null,
+    transactionNonce: tx.nonce ?? null,
+    receiptStatus: params.receipt.status,
+    receiptContractAddress: params.receipt.contractAddress ?? null,
+  });
+
+  if (tx.to != null) {
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      `Deployment confirmed, but the transaction was not a direct CREATE (to=${tx.to}).`,
+    );
+  }
+
+  if (!tx.from || tx.nonce === undefined) {
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      "Deployment confirmed, but the CREATE transaction is missing from or nonce.",
+    );
+  }
+
+  return getContractAddress({
+    from: tx.from,
+    nonce: BigInt(tx.nonce),
+  });
+}
+
 export async function executeDeployContract(
   params: DeployContractParams,
 ): Promise<WalletTxResult & { contractAddress?: Address }> {
@@ -830,11 +909,23 @@ export async function executeDeployContract(
         "Deployment transaction reverted.",
       );
     }
+
+    let contractAddress = receipt.contractAddress ?? undefined;
+    if (params.host === "baseApp" && !contractAddress) {
+      contractAddress = await recoverBaseAppCreateAddress({
+        config: params.config,
+        host: params.host,
+        chainId,
+        hash,
+        receipt,
+      });
+    }
+
     return {
       hash,
       callsId: null,
       method: "deployContract",
-      contractAddress: receipt.contractAddress ?? undefined,
+      contractAddress,
     };
   } catch (error) {
     throw toWalletError(error);
