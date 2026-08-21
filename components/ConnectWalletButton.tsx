@@ -1,7 +1,9 @@
 "use client";
 
-import { connectPreferredWallet, useWalletHost } from "@/lib/wallet";
-import { useAccount, useConfig, useConnect } from "wagmi";
+import { useAppEnvironment } from "@/hooks/useAppEnvironment";
+import { detectAppEnvironment } from "@/lib/miniapp/environment";
+import { getPreferredConnector } from "@/lib/wallet/getPreferredConnector";
+import { useAccount, useConnect } from "wagmi";
 
 type ConnectWalletButtonProps = {
   connectLabel?: string;
@@ -28,9 +30,8 @@ export default function ConnectWalletButton({
 }: ConnectWalletButtonProps) {
   const account = useAccount();
   const { isConnected } = account;
-  const { isPending } = useConnect();
-  const config = useConfig();
-  const host = useWalletHost();
+  const { connect, connectors, isPending } = useConnect();
+  const { environment, isReady } = useAppEnvironment();
 
   if (completedLabel && questCompleted) {
     return (
@@ -45,14 +46,18 @@ export default function ConnectWalletButton({
   }
 
   const handleConnect = async () => {
-    try {
-      await connectPreferredWallet({
-        config,
-        host,
-      });
-    } catch (error) {
-      console.error("[ConnectWalletButton] connect failed:", error);
+    const resolvedEnvironment = isReady
+      ? environment
+      : await detectAppEnvironment();
+
+    const connector = getPreferredConnector(connectors, resolvedEnvironment);
+
+    if (!connector) {
+      console.error("[ConnectWalletButton] No connector found");
+      return;
     }
+
+    connect({ connector });
   };
 
   const disabled = isPending || isConnected;

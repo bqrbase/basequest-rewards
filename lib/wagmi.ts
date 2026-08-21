@@ -87,11 +87,17 @@ export function createBrowserWagmiConfig(): Config {
 }
 
 /**
- * Base App connectors only — never loads or registers farcasterMiniApp().
- * Register baseAccount only so reconnect cannot bind injected()/WC.
+ * Base App connectors — never loads or registers farcasterMiniApp().
+ * Pre-NFT order: baseAccount, Coinbase, injected, WalletConnect so the
+ * in-app provider can bind. Farcaster stays farcasterMiniApp-only.
  */
 export function createBaseAppWagmiConfig(): Config {
-  return createSharedConfig([baseAccount({ appName: APP_NAME })]);
+  return createSharedConfig([
+    baseAccount({ appName: APP_NAME }),
+    createCoinbaseWalletConnector(),
+    injected(),
+    createWalletConnectConnector(),
+  ]);
 }
 
 /**
@@ -114,7 +120,7 @@ export async function createFarcasterWagmiConfig(): Promise<Config> {
  * Environment-aware wagmi config factory.
  * - Browser: injected, coinbaseWallet, walletConnect
  * - Farcaster: farcasterMiniApp only
- * - Base App: baseAccount only
+ * - Base App: baseAccount, coinbaseWallet, injected, walletConnect
  */
 export async function createWagmiConfig(host: WalletHost): Promise<Config> {
   if (host === "baseApp") {
