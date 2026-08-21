@@ -955,14 +955,14 @@ async function deployContractViaCreate2Deployer(params: {
     );
   }
 
-  // Pin to receipt block; retry briefly if public RPC latest lag returns empty.
+  // Receipt succeeded and CREATE2 address is predicted; verify via latest getBytecode.
+  // Retry briefly if public RPC is temporarily behind (do not query receipt.blockNumber).
   const maxAttempts = 3;
   let deployedCode: Hex | undefined;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     deployedCode = await getBytecode(params.config, {
       address: predictedAddress,
       chainId: params.chainId,
-      blockNumber: receipt.blockNumber,
     });
     if (deployedCode && deployedCode !== "0x") {
       break;
