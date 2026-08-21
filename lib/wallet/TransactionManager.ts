@@ -6,10 +6,9 @@ import {
   concat,
   encodeDeployData,
   encodeFunctionData,
-  encodePacked,
   getContractAddress,
-  keccak256,
   numberToHex,
+  toHex,
 } from "viem";
 import type { Config } from "wagmi";
 import {
@@ -66,8 +65,6 @@ const CREATE2_DEPLOYER_ABI = [
     outputs: [],
   },
 ] as const;
-
-const BASE_APP_HELLO_BASE_SALT_PREFIX = "basequest.hellobase.v1";
 
 function extractSendCallsId(result: unknown): string | null {
   if (typeof result === "string" && result.startsWith("0x")) {
@@ -905,12 +902,8 @@ async function deployContractViaCreate2Deployer(params: {
     ? concat([deployData, params.dataSuffix])
     : deployData;
 
-  const salt = keccak256(
-    encodePacked(
-      ["string", "address", "bytes32"],
-      [BASE_APP_HELLO_BASE_SALT_PREFIX, from, keccak256(code)],
-    ),
-  );
+  // Unique per attempt so CREATE2 address is never reused across deploys.
+  const salt = toHex(crypto.getRandomValues(new Uint8Array(32)));
 
   const predictedAddress = getContractAddress({
     bytecode: code,
