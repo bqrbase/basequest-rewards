@@ -26,6 +26,7 @@ import {
 import {
   WalletError,
   extractProviderRejection,
+  getErrorMessage,
   isMethodUnsupportedError,
   isUserRejectedError,
   toWalletError,
@@ -539,6 +540,41 @@ function applyGasMargin(estimatedGas: bigint): Hex {
   return numberToHex(withMargin);
 }
 
+/** Internal Farcaster Wallet rejects eth_estimateGas with EIP-1193 4200. Rainbow does not. */
+function isFarcasterInternalEstimateUnsupported(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  const layers = extractProviderRejection(error).layers;
+  const mentionsEstimateGas =
+    /eth_estimateGas/i.test(message) ||
+    layers.some(
+      (layer) =>
+        typeof layer.message === "string" &&
+        /eth_estimateGas/i.test(layer.message),
+    );
+  if (!mentionsEstimateGas) {
+    return false;
+  }
+  const has4200 =
+    /code=4200/.test(message) ||
+    layers.some((layer) => layer.code === 4200 || layer.code === "4200");
+  return (
+    has4200 ||
+    isMethodUnsupportedError(error) ||
+    /does not support the requested method/i.test(message)
+  );
+}
+
+function requireTransactionHash(hash: unknown): Hash {
+  if (typeof hash !== "string" || !hash.startsWith("0x")) {
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      "Farcaster host did not return a transaction hash.",
+      hash,
+    );
+  }
+  return hash as Hash;
+}
+
 async function requestFarcasterHostRpc(params: {
   host: FarcasterHostRpc;
   method: string;
@@ -600,8 +636,12 @@ async function requestFarcasterHostRpc(params: {
 }
 
 /**
- * Farcaster CREATE deploy: estimate gas on the same host RPC Rainbow uses,
- * then send { from, data, gas }. No `to`, chainId, value, nonce, or DATA_SUFFIX.
+ * Farcaster CREATE deploy:
+ * - External Rainbow: same-host eth_estimateGas + 20% margin, then
+ *   eth_sendTransaction({ from, data, gas }).
+ * - Internal Farcaster Wallet: eth_sendTransaction({ from, data }) with no
+ *   estimate (host rejects eth_estimateGas with 4200).
+ * No `to`, chainId, value, nonce, or DATA_SUFFIX.
  */
 async function deployContractViaMiniAppProvider(params: {
   config: Config;
@@ -670,11 +710,29 @@ async function deployContractViaMiniAppProvider(params: {
   const host = miniAppHost;
 
   if (host?.ethProviderRequestV2 || host?.ethProviderRequest) {
-    const estimatedRaw = await requestFarcasterHostRpc({
-      host,
-      method: "eth_estimateGas",
-      rpcParams: [estimateTx],
-    });
+    let estimatedRaw: unknown;
+    try {
+      estimatedRaw = await requestFarcasterHostRpc({
+        host,
+        method: "eth_estimateGas",
+        rpcParams: [estimateTx],
+      });
+    } catch (error) {
+      if (isFarcasterInternalEstimateUnsupported(error)) {
+        walletLogger.error("farcaster-deploy-internal", {
+          skippedEstimateGas: true,
+          sendRequest: snapshotSendTransaction(estimateTx),
+        });
+        return requireTransactionHash(
+          await requestFarcasterHostRpc({
+            host,
+            method: "eth_sendTransaction",
+            rpcParams: [estimateTx],
+          }),
+        );
+      }
+      throw error;
+    }
     const estimatedGas = parseHexQuantity(estimatedRaw);
     const gas = applyGasMargin(estimatedGas);
     const sendTx = {
@@ -729,10 +787,27 @@ async function deployContractViaMiniAppProvider(params: {
   }
 
   try {
-    const estimatedRaw = await provider.request({
-      method: "eth_estimateGas",
-      params: [estimateTx],
-    });
+    let estimatedRaw: unknown;
+    try {
+      estimatedRaw = await provider.request({
+        method: "eth_estimateGas",
+        params: [estimateTx],
+      });
+    } catch (estimateError) {
+      if (isFarcasterInternalEstimateUnsupported(estimateError)) {
+        walletLogger.error("farcaster-deploy-internal", {
+          skippedEstimateGas: true,
+          sendRequest: snapshotSendTransaction(estimateTx),
+        });
+        return requireTransactionHash(
+          await provider.request({
+            method: "eth_sendTransaction",
+            params: [estimateTx],
+          }),
+        );
+      }
+      throw estimateError;
+    }
     const estimatedGas = parseHexQuantity(estimatedRaw);
     const gas = applyGasMargin(estimatedGas);
     const sendTx = {
