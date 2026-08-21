@@ -3,17 +3,19 @@ import {
   type Address,
   type Hash,
   type Hex,
-  type TransactionReceipt,
+  concat,
   encodeDeployData,
   encodeFunctionData,
+  encodePacked,
   getContractAddress,
+  keccak256,
   numberToHex,
 } from "viem";
 import type { Config } from "wagmi";
 import {
   deployContract,
   getAccount,
-  getTransaction,
+  getBytecode,
   waitForTransactionReceipt,
   writeContract,
 } from "wagmi/actions";
@@ -46,6 +48,26 @@ import type {
   WalletRequestClient,
   WalletTxResult,
 } from "@/lib/wallet/types";
+
+/** Base preinstall Create2Deployer — Smart Wallet deploy must CALL this, not native CREATE. */
+const BASE_CREATE2_DEPLOYER_ADDRESS =
+  "0x13b0D85CcB8bf860b6b79AF3029fCA081AE9beF2" as const satisfies Address;
+
+const CREATE2_DEPLOYER_ABI = [
+  {
+    type: "function",
+    name: "deploy",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "value", type: "uint256" },
+      { name: "salt", type: "bytes32" },
+      { name: "code", type: "bytes" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+const BASE_APP_HELLO_BASE_SALT_PREFIX = "basequest.hellobase.v1";
 
 function extractSendCallsId(result: unknown): string | null {
   if (typeof result === "string" && result.startsWith("0x")) {
@@ -861,79 +883,97 @@ async function deployContractViaMiniAppProvider(params: {
 }
 
 /**
- * Base App only: recover a missing receipt.contractAddress for a confirmed
- * CREATE tx. Uses the confirmed transaction's from + nonce. Never CREATE2.
+ * Base App only: deploy via Create2Deployer CALL (Smart Wallet cannot native CREATE).
+ * Predicts the CREATE2 address, sends deploy(value, salt, code), then verifies code.
  */
-async function recoverBaseAppCreateAddress(params: {
+async function deployContractViaCreate2Deployer(params: {
   config: Config;
-  host: WalletHost;
   chainId: number;
-  hash: Hash;
-  receipt: TransactionReceipt;
-}): Promise<Address> {
-  const walletDiagnostics = await collectDeployWalletDiagnostics({
-    config: params.config,
-    host: params.host,
+  abi: Abi;
+  bytecode: Hex;
+  args?: readonly unknown[];
+  dataSuffix?: Hex;
+}): Promise<{ hash: Hash; contractAddress: Address }> {
+  const from = requireConnectedAddress(params.config);
+
+  const deployData = encodeDeployData({
+    abi: params.abi,
+    bytecode: params.bytecode,
+    args: params.args as never,
+  });
+  const code: Hex = params.dataSuffix
+    ? concat([deployData, params.dataSuffix])
+    : deployData;
+
+  const salt = keccak256(
+    encodePacked(
+      ["string", "address", "bytes32"],
+      [BASE_APP_HELLO_BASE_SALT_PREFIX, from, keccak256(code)],
+    ),
+  );
+
+  const predictedAddress = getContractAddress({
+    bytecode: code,
+    from: BASE_CREATE2_DEPLOYER_ADDRESS,
+    opcode: "CREATE2",
+    salt,
+  });
+
+  walletLogger.error("baseapp-create2-deploy", {
+    deployer: BASE_CREATE2_DEPLOYER_ADDRESS,
+    from,
+    salt,
+    predictedAddress,
+    codeBytes: inspectHexPayload(code).byteLength,
+    dataSuffixBytes: params.dataSuffix
+      ? inspectHexPayload(params.dataSuffix).byteLength
+      : 0,
+  });
+
+  const existing = await getBytecode(params.config, {
+    address: predictedAddress,
     chainId: params.chainId,
   });
-
-  let tx: {
-    from?: Address;
-    to?: Address | null;
-    nonce?: number;
-  };
-  try {
-    tx = await getTransaction(params.config, {
-      hash: params.hash,
-      chainId: params.chainId,
-    });
-  } catch (error) {
-    walletLogger.error("baseapp-deploy-tx-unavailable", {
-      host: params.host,
-      transactionHash: params.hash,
-      receiptStatus: params.receipt.status,
-      receiptContractAddress: params.receipt.contractAddress ?? null,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  if (existing && existing !== "0x") {
     throw new WalletError(
       "TRANSACTION_FAILED",
-      "Deployment confirmed, but the transaction could not be retrieved to recover the contract address.",
-      error,
+      `A contract is already deployed at the predicted address (${predictedAddress}).`,
     );
   }
 
-  walletLogger.error("baseapp-deploy-receipt", {
-    host: params.host,
-    activeConnectorId: walletDiagnostics.activeConnectorId,
-    connectedWalletAddress: walletDiagnostics.connectedAddress,
-    walletClientAccount: walletDiagnostics.walletClientAccount,
-    walletClientChainId: walletDiagnostics.walletClientChainId,
-    transactionHash: params.hash,
-    transactionFrom: tx.from ?? null,
-    transactionTo: tx.to ?? null,
-    transactionNonce: tx.nonce ?? null,
-    receiptStatus: params.receipt.status,
-    receiptContractAddress: params.receipt.contractAddress ?? null,
+  const hash = await writeContract(params.config, {
+    address: BASE_CREATE2_DEPLOYER_ADDRESS,
+    abi: CREATE2_DEPLOYER_ABI,
+    functionName: "deploy",
+    args: [0n, salt, code],
+    chainId: params.chainId,
+    account: from,
   });
 
-  if (tx.to != null) {
-    throw new WalletError(
-      "TRANSACTION_FAILED",
-      `Deployment confirmed, but the transaction was not a direct CREATE (to=${tx.to}).`,
-    );
-  }
-
-  if (!tx.from || tx.nonce === undefined) {
-    throw new WalletError(
-      "TRANSACTION_FAILED",
-      "Deployment confirmed, but the CREATE transaction is missing from or nonce.",
-    );
-  }
-
-  return getContractAddress({
-    from: tx.from,
-    nonce: BigInt(tx.nonce),
+  const receipt = await waitForTransactionReceipt(params.config, {
+    hash,
+    confirmations: 1,
+    chainId: params.chainId,
   });
+  if (receipt.status !== "success") {
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      "Create2Deployer deployment transaction reverted.",
+    );
+  }
+
+  const deployedCode = await getBytecode(params.config, {
+    address: predictedAddress,
+    chainId: params.chainId,
+  });
+  if (!deployedCode || deployedCode === "0x") {
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      `Deployment confirmed, but no code was found at the predicted CREATE2 address (${predictedAddress}).`,
+    );
+  }
+
+  return { hash, contractAddress: predictedAddress };
 }
 
 export async function executeDeployContract(
@@ -956,6 +996,23 @@ export async function executeDeployContract(
   );
 
   try {
+    if (params.host === "baseApp") {
+      const { hash, contractAddress } = await deployContractViaCreate2Deployer({
+        config: params.config,
+        chainId,
+        abi: params.abi,
+        bytecode: params.bytecode,
+        args: params.args,
+        dataSuffix: params.dataSuffix,
+      });
+      return {
+        hash,
+        callsId: null,
+        method: "deployContract",
+        contractAddress,
+      };
+    }
+
     const hash =
       params.host === "farcaster"
         ? await deployContractViaMiniAppProvider({
@@ -985,22 +1042,11 @@ export async function executeDeployContract(
       );
     }
 
-    let contractAddress = receipt.contractAddress ?? undefined;
-    if (params.host === "baseApp" && !contractAddress) {
-      contractAddress = await recoverBaseAppCreateAddress({
-        config: params.config,
-        host: params.host,
-        chainId,
-        hash,
-        receipt,
-      });
-    }
-
     return {
       hash,
       callsId: null,
       method: "deployContract",
-      contractAddress,
+      contractAddress: receipt.contractAddress ?? undefined,
     };
   } catch (error) {
     throw toWalletError(error);
