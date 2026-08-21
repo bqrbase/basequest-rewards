@@ -3,12 +3,12 @@ import {
   awardOneTimeQuest,
   progressResponse,
 } from "@/lib/quests/awardOneTimeQuest";
-import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
 import { extractSupabaseError } from "@/lib/supabase/deployedContracts";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
 } from "@/lib/x/config";
+import { verifyX402PaymentTransactionWithRetry } from "@/lib/x402/verifyX402PaymentTransaction";
 
 type CompleteBody = {
   wallet?: string;
@@ -17,7 +17,7 @@ type CompleteBody = {
 
 /**
  * POST /api/quests/x402-payment/complete
- * Requires verified payment tx from the claimed wallet.
+ * Requires verified x402 USDC authorization from the claimed wallet.
  */
 export async function POST(request: Request) {
   try {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseTransactionWithRetry({
+    const verification = await verifyX402PaymentTransactionWithRetry({
       txHash,
       walletAddress,
     });
