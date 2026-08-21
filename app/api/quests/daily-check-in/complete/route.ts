@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { DAILY_CHECK_IN_ADDRESS } from "@/lib/contracts/DailyCheckIn";
-import { CHECK_IN_SELECTOR } from "@/lib/chain/questContracts";
-import { verifyBaseTransactionWithRetry } from "@/lib/chain/verifyBaseTransaction";
+import { verifyDailyCheckInTransaction } from "@/lib/chain/verifyDailyCheckInTransaction";
 import {
   awardOneTimeQuest,
   progressResponse,
@@ -50,11 +48,9 @@ export async function POST(request: Request) {
     }
 
     const walletAddress = normalizeWalletAddress(wallet);
-    const verification = await verifyBaseTransactionWithRetry({
+    const verification = await verifyDailyCheckInTransaction({
       txHash,
       walletAddress,
-      expectedTo: DAILY_CHECK_IN_ADDRESS,
-      expectedFunctionSelector: CHECK_IN_SELECTOR,
     });
 
     if (!verification.ok) {
