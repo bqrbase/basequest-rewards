@@ -196,7 +196,7 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
     title: "Deploy Contract",
     description:
       "Choose a contract template and deploy your first contract on Base.",
-    rewardXp: 50,
+    rewardXp: 5,
     ...QUEST_ENGINE_METADATA["deploy-contract"],
   },
   {

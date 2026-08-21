@@ -489,7 +489,7 @@ export default function DeployContractModal({
               </p>
             ) : (
               <p className="mt-4 text-center text-xs text-emerald-200/80">
-                +50 XP awarded
+                +5 XP awarded
               </p>
             )}
 

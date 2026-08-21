@@ -21,7 +21,7 @@ export default function DeployContractQuestCard({
   const [open, setOpen] = useState(false);
   // Presentation is always active — never show Completed / disabled CTA.
   const status: QuestStatus = "available";
-  const reward = quest?.reward ?? "+50 XP";
+  const reward = quest?.reward ?? "+5 XP";
   const title = quest?.title ?? "Deploy Contract";
   const description =
     quest?.description ??
