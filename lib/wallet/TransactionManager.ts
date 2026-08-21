@@ -962,10 +962,22 @@ async function deployContractViaCreate2Deployer(params: {
     );
   }
 
-  const deployedCode = await getBytecode(params.config, {
-    address: predictedAddress,
-    chainId: params.chainId,
-  });
+  // Pin to receipt block; retry briefly if public RPC latest lag returns empty.
+  const maxAttempts = 3;
+  let deployedCode: Hex | undefined;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    deployedCode = await getBytecode(params.config, {
+      address: predictedAddress,
+      chainId: params.chainId,
+      blockNumber: receipt.blockNumber,
+    });
+    if (deployedCode && deployedCode !== "0x") {
+      break;
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    }
+  }
   if (!deployedCode || deployedCode === "0x") {
     throw new WalletError(
       "TRANSACTION_FAILED",
