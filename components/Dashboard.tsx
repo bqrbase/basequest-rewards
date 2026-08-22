@@ -6,6 +6,7 @@ import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import GlassPanel from "@/components/GlassPanel";
+import JesseCatMintCard from "@/components/JesseCatMintCard";
 import MintGenesisQuestCard from "@/components/MintGenesisQuestCard";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
 import LevelProgressBar from "@/components/LevelProgressBar";
@@ -142,6 +143,7 @@ export default function Dashboard() {
                 quest={quests.find((quest) => quest.id === "claim-nft")}
                 onCompleted={applyServerProgress}
               />
+              <JesseCatMintCard />
               {exploreBaseQuest ? (
                 <QuestCard
                   questId={exploreBaseQuest.id}
