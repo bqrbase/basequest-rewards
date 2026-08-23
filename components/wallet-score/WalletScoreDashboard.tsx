@@ -2,23 +2,13 @@
 
 import { useWalletScoreData } from "@/hooks/useWalletScoreData";
 import type { ScoreCategoryId } from "@/lib/wallet-score/scoring/types";
-import { getScoreImprovementSuggestions } from "@/lib/wallet-score/scoring";
 import { formatWalletAddress } from "@/lib/ui-styles";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
   PolarAngleAxis,
   RadialBar,
   RadialBarChart,
   ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 
 const PALETTE = {
@@ -30,30 +20,6 @@ const PALETTE = {
   gold: "#fbbf24",
   green: "#34d399",
 } as const;
-
-const CHART_COLORS = [
-  "#0052ff",
-  "#6366f1",
-  "#7c3aed",
-  "#22d3ee",
-  "#818cf8",
-] as const;
-
-const CHART_TICK = {
-  fill: "rgb(255 255 255 / 70%)",
-  fontSize: 10,
-};
-
-const CHART_GRID = "rgb(255 255 255 / 8%)";
-
-const TOOLTIP_STYLE = {
-  backgroundColor: "rgb(10 16 40 / 95%)",
-  border: "1px solid rgb(99 102 241 / 30%)",
-  borderRadius: "1rem",
-  color: "#ffffff",
-  fontSize: "12px",
-  boxShadow: "0 12px 40px rgb(0 0 0 / 35%)",
-};
 
 const PROTOCOL_BAR_COLORS = [
   PALETTE.base,
@@ -133,6 +99,78 @@ function CompactScoreRing({
   );
 }
 
+const SCORE_LOADING_STATUS = [
+  "Analyzing your wallet...",
+  "Scanning Base activity...",
+  "Calculating your score...",
+] as const;
+
+function ScoreRingSkeleton() {
+  const [statusIndex, setStatusIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setStatusIndex((index) => (index + 1) % SCORE_LOADING_STATUS.length);
+    }, 2400);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div
+      className="flex flex-col items-center gap-2 px-1 py-0.5"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="relative h-[5.75rem] w-[5.75rem] shrink-0 sm:h-[6.25rem] sm:w-[6.25rem]">
+        <div
+          aria-hidden
+          className="bq-score-glow pointer-events-none absolute inset-[-28%] rounded-full bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.42)_0%,rgba(34,211,238,0.22)_38%,transparent_70%)] blur-xl"
+        />
+        <svg
+          className="bq-score-spin absolute inset-0"
+          viewBox="0 0 100 100"
+          aria-hidden
+        >
+          <circle
+            cx="50"
+            cy="50"
+            r="42"
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="6"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r="42"
+            fill="none"
+            stroke="url(#bq-score-arc)"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray="72 192"
+          />
+          <defs>
+            <linearGradient id="bq-score-arc" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#22d3ee" />
+              <stop offset="50%" stopColor="#0052ff" />
+              <stop offset="100%" stopColor="#fbbf24" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <div className="pointer-events-none absolute inset-[22%] overflow-hidden rounded-full border border-white/10 bg-white/[0.04]">
+          <div className="bq-score-shimmer absolute inset-0" />
+        </div>
+      </div>
+      <p className="max-w-[8.5rem] text-center text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-amber-100/85">
+        Emerging Score
+      </p>
+      <p className="max-w-[9.5rem] text-center text-[0.68rem] leading-snug text-cyan-100/80">
+        {SCORE_LOADING_STATUS[statusIndex]}
+      </p>
+    </div>
+  );
+}
+
 const HERO_CHIP_ACCENTS = {
   eth: {
     border: "border-base-blue/30 hover:border-base-blue/50",
@@ -206,151 +244,6 @@ function Reveal({
       style={{ animationDelay: `${delayMs}ms` }}
     >
       {children}
-    </div>
-  );
-}
-
-function PortfolioChart({
-  slices,
-}: {
-  slices: Array<{
-    id: string;
-    label: string;
-    percent: number;
-    valueUsd: string;
-    color: string;
-  }>;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-8">
-      <div className="h-44 w-44 shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={slices}
-              dataKey="percent"
-              nameKey="label"
-              innerRadius={52}
-              outerRadius={72}
-              paddingAngle={3}
-              stroke="rgba(255,255,255,0.08)"
-              strokeWidth={1}
-            >
-              {slices.map((slice, index) => (
-                <Cell
-                  key={slice.id}
-                  fill={CHART_COLORS[index % CHART_COLORS.length]}
-                />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={TOOLTIP_STYLE}
-              formatter={(value, name, item) => {
-                const percent =
-                  typeof value === "number" ? value : Number(value);
-                const usd = item?.payload?.valueUsd ?? "";
-                return [`${percent}% · ${usd}`, String(name)];
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      <ul className="w-full space-y-2.5">
-        {slices.map((slice, index) => {
-          const color = CHART_COLORS[index % CHART_COLORS.length];
-          return (
-            <li
-              key={slice.id}
-              className="flex items-center justify-between gap-3 text-sm"
-            >
-              <span className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className="size-2.5 shrink-0 rounded-full shadow-[0_0_8px_rgba(0,82,255,0.35)]"
-                  style={{ backgroundColor: color }}
-                  aria-hidden
-                />
-                <span className="truncate text-[0.7rem] uppercase tracking-wide text-white/55">
-                  {slice.label}
-                </span>
-              </span>
-              <span className="shrink-0 text-base font-bold tabular-nums text-white">
-                {slice.percent}%
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function ActivityChart({
-  activity,
-}: {
-  activity: Array<{ day: string; transactions: number; volumeUsd: number }>;
-}) {
-  return (
-    <div className="h-48 w-full sm:h-52">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={activity}
-          margin={{ top: 8, right: 4, left: -18, bottom: 0 }}
-        >
-          <defs>
-            <linearGradient id="walletActivityFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={PALETTE.base} stopOpacity={0.45} />
-              <stop offset="50%" stopColor={PALETTE.indigo} stopOpacity={0.22} />
-              <stop offset="100%" stopColor={PALETTE.cyan} stopOpacity={0.04} />
-            </linearGradient>
-            <linearGradient id="walletActivityStroke" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={PALETTE.base} />
-              <stop offset="50%" stopColor={PALETTE.indigo} />
-              <stop offset="100%" stopColor={PALETTE.cyan} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid
-            stroke={CHART_GRID}
-            strokeDasharray="3 3"
-            vertical={false}
-          />
-          <XAxis
-            dataKey="day"
-            tick={CHART_TICK}
-            axisLine={false}
-            tickLine={false}
-            minTickGap={28}
-          />
-          <YAxis
-            tick={CHART_TICK}
-            axisLine={false}
-            tickLine={false}
-            width={36}
-          />
-          <Tooltip
-            contentStyle={TOOLTIP_STYLE}
-            formatter={(value, name) => {
-              if (name === "transactions") {
-                return [value, "Transactions"];
-              }
-              return [`$${Number(value).toLocaleString()}`, "Volume"];
-            }}
-          />
-          <Area
-            type="monotone"
-            dataKey="transactions"
-            stroke="url(#walletActivityStroke)"
-            strokeWidth={2.75}
-            fill="url(#walletActivityFill)"
-            activeDot={{
-              r: 5,
-              fill: "#ffffff",
-              stroke: PALETTE.cyan,
-              strokeWidth: 2,
-            }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   );
 }
@@ -680,37 +573,6 @@ const BREAKDOWN_BAR_TONES: Record<ScoreCategoryId, string> = {
   consistency: "from-emerald-400 to-teal-300",
 };
 
-function FallbackCard({
-  title,
-  message,
-}: {
-  title: string;
-  message: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.04] via-[#12183a]/40 to-transparent px-4 py-8 text-center shadow-[0_8px_24px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:px-6">
-      <p className="text-[0.55rem] font-semibold uppercase tracking-[0.16em] text-white/40">
-        {title}
-      </p>
-      <p className="mt-2 text-sm leading-relaxed text-white/55">{message}</p>
-    </div>
-  );
-}
-
-function SectionSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0c142e]/85 via-[#12183a]/78 to-[#151040]/80 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:p-6">
-      <div className="animate-pulse space-y-3">
-        <div className="h-3 w-24 rounded bg-white/10" />
-        <div className="h-6 w-48 rounded bg-white/10" />
-        {Array.from({ length: rows }, (_, index) => (
-          <div key={index} className="h-12 rounded-xl bg-white/[0.06]" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function StatusBanner({
   message,
   fromCache,
@@ -737,58 +599,9 @@ function StatusBanner({
   );
 }
 
-type SectionKind = "loading" | "connect" | "empty" | "error" | "data";
-
-function resolveSectionKind(options: {
-  isConnected: boolean;
-  isLoading: boolean;
-  hasData: boolean;
-  health: "ok" | "degraded" | "empty" | "unavailable";
-  sectionError?: string;
-}): SectionKind {
-  if (!options.isConnected) {
-    return "connect";
-  }
-  if (options.isLoading) {
-    return "loading";
-  }
-  if (options.hasData) {
-    return "data";
-  }
-  if (options.health === "empty") {
-    return "empty";
-  }
-  if (options.sectionError || options.health === "unavailable") {
-    return "error";
-  }
-  return "empty";
-}
-
-function sectionFallbackMessage(
-  kind: SectionKind,
-  emptyMessage: string,
-  errorMessage?: string | null,
-) {
-  if (kind === "connect") {
-    return "Connect a wallet to load live Base analytics for this section.";
-  }
-  if (kind === "error") {
-    return (
-      errorMessage ||
-      "This section is temporarily unavailable. Please try again shortly."
-    );
-  }
-  return emptyMessage;
-}
-
 export default function WalletScoreDashboard() {
   const view = useWalletScoreData();
   const { hero, stats, live, analytics, score, ecosystem } = view;
-  const improvementSuggestions = getScoreImprovementSuggestions(
-    score.breakdown,
-    score.maxScore,
-  );
-  const sectionSource = analytics.source;
   const bannerMessage =
     live.errors.analytics || analytics.statusMessage || null;
 
@@ -811,8 +624,53 @@ export default function WalletScoreDashboard() {
         .bq-fade-up {
           animation: bq-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
         }
+        @keyframes bq-score-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @keyframes bq-score-glow {
+          0%,
+          100% {
+            opacity: 0.55;
+            transform: scale(0.96);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.06);
+          }
+        }
+        @keyframes bq-score-shimmer {
+          0% {
+            transform: translateX(-120%);
+          }
+          100% {
+            transform: translateX(120%);
+          }
+        }
+        .bq-score-spin {
+          animation: bq-score-spin 1.35s linear infinite;
+        }
+        .bq-score-glow {
+          animation: bq-score-glow 1.8s ease-in-out infinite;
+        }
+        .bq-score-shimmer {
+          background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(34, 211, 238, 0.22),
+            rgba(0, 82, 255, 0.28),
+            transparent
+          );
+          animation: bq-score-shimmer 1.6s ease-in-out infinite;
+        }
         @media (prefers-reduced-motion: reduce) {
           .bq-fade-up {
+            animation: none;
+          }
+          .bq-score-spin,
+          .bq-score-glow,
+          .bq-score-shimmer {
             animation: none;
           }
         }
@@ -879,32 +737,49 @@ export default function WalletScoreDashboard() {
                 </div>
 
                 <div className="flex items-center justify-center rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-black/25 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                  <CompactScoreRing
-                    score={hero.score}
-                    maxScore={hero.maxScore}
-                    subtitle={
-                      hero.tier !== "—" ? `${hero.tier} Score` : "Wallet Score"
-                    }
-                  />
+                  {live.isLoading ? (
+                    <ScoreRingSkeleton />
+                  ) : (
+                    <CompactScoreRing
+                      score={hero.score}
+                      maxScore={hero.maxScore}
+                      subtitle={
+                        hero.tier !== "—"
+                          ? `${hero.tier} Score`
+                          : "Wallet Score"
+                      }
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-1.5 sm:justify-items-end">
-                  <span className="inline-flex w-fit max-w-full truncate rounded-full border border-amber-400/50 bg-amber-500/15 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-amber-50 transition-colors duration-300 hover:bg-amber-500/25">
-                    {hero.tier}
-                  </span>
-                  <span className="inline-flex w-fit max-w-full truncate rounded-full border border-indigo-300/35 bg-indigo-500/15 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-indigo-100 transition-colors duration-300 hover:bg-indigo-500/25 sm:justify-self-end">
-                    {hero.percentile}
-                  </span>
-                  <span className="inline-flex w-fit max-w-full truncate rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-white/60 transition-colors duration-300 hover:bg-white/[0.08]">
-                    Age {statById("age")}
-                  </span>
-                  <span className="inline-flex w-fit max-w-full items-center gap-1 truncate rounded-full border border-emerald-400/40 bg-emerald-500/12 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-emerald-100 transition-colors duration-300 hover:bg-emerald-500/20 sm:justify-self-end">
-                    <span
-                      aria-hidden
-                      className="size-1.5 shrink-0 rounded-full bg-emerald-300"
-                    />
-                    Verified
-                  </span>
+                  {live.isLoading ? (
+                    <>
+                      <span className="inline-flex h-6 w-20 animate-pulse rounded-full border border-white/10 bg-white/[0.06]" />
+                      <span className="inline-flex h-6 w-16 animate-pulse rounded-full border border-white/10 bg-white/[0.06] sm:justify-self-end" />
+                      <span className="inline-flex h-6 w-16 animate-pulse rounded-full border border-white/10 bg-white/[0.06]" />
+                      <span className="inline-flex h-6 w-20 animate-pulse rounded-full border border-white/10 bg-white/[0.06] sm:justify-self-end" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex w-fit max-w-full truncate rounded-full border border-amber-400/50 bg-amber-500/15 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-amber-50 transition-colors duration-300 hover:bg-amber-500/25">
+                        {hero.tier}
+                      </span>
+                      <span className="inline-flex w-fit max-w-full truncate rounded-full border border-indigo-300/35 bg-indigo-500/15 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-indigo-100 transition-colors duration-300 hover:bg-indigo-500/25 sm:justify-self-end">
+                        {hero.percentile}
+                      </span>
+                      <span className="inline-flex w-fit max-w-full truncate rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-white/60 transition-colors duration-300 hover:bg-white/[0.08]">
+                        Age {statById("age")}
+                      </span>
+                      <span className="inline-flex w-fit max-w-full items-center gap-1 truncate rounded-full border border-emerald-400/40 bg-emerald-500/12 px-2.5 py-1 text-[0.55rem] font-semibold uppercase tracking-widest text-emerald-100 transition-colors duration-300 hover:bg-emerald-500/20 sm:justify-self-end">
+                        <span
+                          aria-hidden
+                          className="size-1.5 shrink-0 rounded-full bg-emerald-300"
+                        />
+                        Verified
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -948,6 +823,19 @@ export default function WalletScoreDashboard() {
           />
           <article className={`${panelClassName("primary")} p-5 sm:p-6`}>
             <PanelGlow />
+            {live.isLoading ? (
+              <div className="relative z-10 animate-pulse space-y-4 sm:space-y-5">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between gap-3">
+                      <div className="h-4 w-28 rounded bg-white/10" />
+                      <div className="h-4 w-16 rounded bg-white/10" />
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10" />
+                  </div>
+                ))}
+              </div>
+            ) : (
             <ul className="relative z-10 space-y-4 sm:space-y-5">
               {score.breakdown.map((row) => {
                 const maxPoints = Math.round(row.weight * score.maxScore);
@@ -980,78 +868,8 @@ export default function WalletScoreDashboard() {
                 );
               })}
             </ul>
+            )}
           </article>
-        </section>
-      </Reveal>
-
-      {/* How to Improve — lowest categories from engine breakdown */}
-      <Reveal delayMs={90}>
-        <section>
-          <SectionHeading
-            eyebrow="Growth"
-            title="How to Improve Your Score"
-            description="Focus on the categories with the most room to grow."
-          />
-          {improvementSuggestions.length === 0 ? (
-            <article className={`${panelClassName("secondary")} p-5 sm:p-6`}>
-              <PanelGlow />
-              <p className="relative z-10 text-sm leading-relaxed text-white/55">
-                You are already strong across scored categories. Keep steady
-                Base activity to maintain your rank.
-              </p>
-            </article>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
-              {improvementSuggestions.map((tip) => (
-                <article
-                  key={tip.id}
-                  className={`${panelClassName("primary")} flex flex-col p-5 transition-transform duration-300 hover:-translate-y-0.5 sm:p-6`}
-                >
-                  <PanelGlow />
-                  <div className="relative z-10 flex flex-1 flex-col">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-white sm:text-[0.95rem]">
-                        {tip.categoryLabel}
-                      </p>
-                      <span className="shrink-0 rounded-badge border border-cyan-300/30 bg-cyan-500/15 px-2 py-0.5 text-[0.55rem] font-semibold uppercase tracking-widest text-cyan-100">
-                        +{tip.potentialGain} pts
-                      </span>
-                    </div>
-                    <p className="mt-3 font-mono text-sm tabular-nums text-white/70">
-                      <span className="font-semibold text-white">
-                        {tip.currentPoints}
-                      </span>
-                      <span className="text-white/40">
-                        {" "}
-                        / {tip.maxPoints}
-                      </span>
-                      <span className="ml-2 text-[0.65rem] uppercase tracking-widest text-white/40">
-                        current
-                      </span>
-                    </p>
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className={`h-full rounded-full bg-gradient-to-r ${BREAKDOWN_BAR_TONES[tip.id]}`}
-                        style={{
-                          width: `${
-                            tip.maxPoints > 0
-                              ? Math.min(
-                                  100,
-                                  (tip.currentPoints / tip.maxPoints) * 100,
-                                )
-                              : 0
-                          }%`,
-                        }}
-                      />
-                    </div>
-                    <p className="mt-4 text-sm leading-relaxed text-white/55">
-                      {tip.recommendation}
-                    </p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
         </section>
       </Reveal>
 
@@ -1108,148 +926,6 @@ export default function WalletScoreDashboard() {
             </div>
           )}
         </section>
-      </Reveal>
-
-      {/* Charts */}
-      <Reveal delayMs={140}>
-        <section className="grid grid-cols-1 items-stretch gap-4 sm:gap-5 lg:grid-cols-2">
-          <article
-            className={`${panelClassName("primary")} p-5 transition-transform duration-300 hover:-translate-y-0.5 sm:p-7`}
-          >
-            <PanelGlow />
-            <div className="relative z-10">
-              <div className="mb-4 flex items-center justify-between gap-2 sm:mb-5">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-white/40">
-                  Allocation
-                </p>
-                {sourceBadge(sectionSource)}
-              </div>
-              <h2 className="mt-1.5 font-sans text-lg font-bold tracking-tight text-white sm:text-xl">
-                Portfolio Distribution
-              </h2>
-              <div className="mt-5">
-                {(() => {
-                  const kind = resolveSectionKind({
-                    isConnected: live.isConnected,
-                    isLoading: live.isLoading,
-                    hasData: analytics.portfolioDistribution.length > 0,
-                    health: analytics.health,
-                    sectionError: analytics.sectionErrors.portfolio,
-                  });
-                  if (kind === "loading") {
-                    return <SectionSkeleton rows={3} />;
-                  }
-                  if (kind !== "data") {
-                    return (
-                      <FallbackCard
-                        title="Allocation"
-                        message={sectionFallbackMessage(
-                          kind,
-                          "No portfolio holdings detected on Base yet.",
-                          analytics.sectionErrors.portfolio ||
-                            analytics.statusMessage,
-                        )}
-                      />
-                    );
-                  }
-                  return (
-                    <PortfolioChart slices={analytics.portfolioDistribution} />
-                  );
-                })()}
-              </div>
-            </div>
-          </article>
-
-          <article
-            className={`${panelClassName("primary")} p-5 transition-transform duration-300 hover:-translate-y-0.5 sm:p-7`}
-          >
-            <PanelGlow />
-            <div className="relative z-10">
-              <div className="mb-4 flex items-center justify-between gap-2 sm:mb-5">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-white/40">
-                  Momentum
-                </p>
-                {sourceBadge(sectionSource)}
-              </div>
-              <h2 className="mt-1.5 font-sans text-lg font-bold tracking-tight text-white sm:text-xl">
-                Wallet Activity
-              </h2>
-              <p className="mt-1 text-sm text-white/50">
-                Transactions over the last 14 days
-              </p>
-              <div className="mt-5">
-                {(() => {
-                  const kind = resolveSectionKind({
-                    isConnected: live.isConnected,
-                    isLoading: live.isLoading,
-                    hasData: analytics.walletActivity.some(
-                      (point) => point.transactions > 0,
-                    ),
-                    health: analytics.health,
-                    sectionError: analytics.sectionErrors.activity,
-                  });
-                  if (kind === "loading") {
-                    return <SectionSkeleton rows={3} />;
-                  }
-                  if (kind === "data" || analytics.walletActivity.length > 0) {
-                    return (
-                      <ActivityChart activity={analytics.walletActivity} />
-                    );
-                  }
-                  return (
-                    <FallbackCard
-                      title="Momentum"
-                      message={sectionFallbackMessage(
-                        kind,
-                        "No recent Base activity in the last 14 days.",
-                        analytics.sectionErrors.activity ||
-                          analytics.statusMessage,
-                      )}
-                    />
-                  );
-                })()}
-              </div>
-            </div>
-          </article>
-        </section>
-      </Reveal>
-
-      {/* 8. Achievements */}
-      <Reveal delayMs={320}>
-      <section>
-        <SectionHeading
-          eyebrow="Milestones"
-          title="Achievements"
-          badge={sourceBadge(sectionSource)}
-        />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-          {analytics.achievements.map((item) => (
-            <article
-              key={item.id}
-              className={`relative flex min-h-[6.5rem] flex-col overflow-hidden rounded-card border p-4 shadow-[0_8px_24px_rgba(0,0,0,0.2)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 sm:min-h-[7rem] sm:p-5 ${
-                item.unlocked
-                  ? "border-white/14 bg-white/[0.05] hover:border-violet-300/30 hover:bg-white/[0.07]"
-                  : "border-white/[0.06] bg-white/[0.02] opacity-50 hover:opacity-70"
-              }`}
-            >
-              <PanelGlow />
-              <p
-                className={`relative z-10 text-[0.6rem] font-semibold uppercase tracking-[0.16em] sm:text-[0.65rem] ${
-                  item.unlocked ? "text-white/85" : "text-white/40"
-                }`}
-              >
-                {item.title}
-              </p>
-              <p className="relative z-10 mt-2 flex-1 text-xs leading-relaxed text-white/50">
-                {item.description}
-              </p>
-              <p className="relative z-10 mt-3 text-[0.55rem] font-semibold uppercase tracking-widest text-white/45">
-                {item.unlocked ? "Unlocked" : "Locked"}
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
       </Reveal>
 
       {/* Ecosystem Usage — existing analysis output */}

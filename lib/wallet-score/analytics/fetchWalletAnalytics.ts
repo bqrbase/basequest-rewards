@@ -1,5 +1,4 @@
 import type { WalletAnalytics } from "@/lib/wallet-score/analytics/types";
-import { fetchNftGalleryItems } from "@/lib/wallet-score/analytics/fetchNftGallery";
 import {
   fetchNativeBalances,
   filterCountableTokens,
@@ -220,15 +219,6 @@ async function loadWalletAnalytics(
   tokens = filterCountableTokens(tokens);
   const tokenStats = countFilteredTokens(tokens);
 
-  let nftItems: WalletAnalytics["nftItems"] = [];
-  try {
-    nftItems = await fetchNftGalleryItems(address, 8);
-  } catch (error) {
-    errors.nfts =
-      errors.nfts ||
-      (error instanceof Error ? error.message : "NFT gallery unavailable");
-  }
-
   let ethBalance: string | null = null;
   let ethUsd: number | null = null;
   let usdcBalance: string | null = null;
@@ -261,7 +251,7 @@ async function loadWalletAnalytics(
       ethUsd,
       usdcBalance,
       tokens,
-      nftItems,
+      nftItems: [],
       transactions,
       protocols: ecosystem?.protocols ?? [],
       metrics: {

@@ -96,23 +96,19 @@ export function composeWalletScoreView(
 
   const useLiveMetrics = live.isConnected && !live.isLoading;
   const scoreResult = calculateWalletScore(
-    live.isConnected
+    useLiveMetrics
       ? {
-          walletAgeDays: useLiveMetrics ? live.walletAgeDays : null,
-          transactionCount: useLiveMetrics ? live.transactionCount : null,
-          activeDays: useLiveMetrics ? live.activeDays : null,
-          contractInteractions: useLiveMetrics
-            ? live.contractInteractions
-            : null,
-          uniqueTokens: useLiveMetrics ? live.uniqueTokens : null,
-          nftCount: useLiveMetrics ? live.nftCount : null,
-          protocolCount: useLiveMetrics ? live.protocolsUsed : null,
-          protocolInteractions: useLiveMetrics
-            ? live.protocolInteractions
-            : null,
+          walletAgeDays: live.walletAgeDays,
+          transactionCount: live.transactionCount,
+          activeDays: live.activeDays,
+          contractInteractions: live.contractInteractions,
+          uniqueTokens: live.uniqueTokens,
+          nftCount: live.nftCount,
+          protocolCount: live.protocolsUsed,
+          protocolInteractions: live.protocolInteractions,
         }
       : {
-          // Disconnected: score zeros instead of engine mock fallbacks in the UI.
+          // Disconnected or still loading: never score mock dashboard metrics in the UI.
           walletAgeDays: 0,
           transactionCount: 0,
           activeDays: 0,
