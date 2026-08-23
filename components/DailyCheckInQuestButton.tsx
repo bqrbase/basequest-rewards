@@ -12,6 +12,7 @@ import {
   isBaseMainnetSwitchRejected,
 } from "@/lib/wallet/ensureBaseMainnet";
 import { walletLogger } from "@/lib/wallet/logger";
+import { sendFarcasterCallTransaction } from "@/lib/wallet/TransactionManager";
 import { useWalletHost } from "@/lib/wallet/WalletHostContext";
 import { useCallback, useState } from "react";
 import {
@@ -289,6 +290,32 @@ export default function DailyCheckInQuestButton({
 
       const account = getAccount(config);
       const connectedAddress = account.address;
+
+      // Clean ABI calldata — builder attribution goes only via capabilities.
+      const data = encodeFunctionData({
+        abi: DAILY_CHECK_IN_ABI,
+        functionName: "checkIn",
+      });
+
+      if (host === "farcaster") {
+        const from = connectedAddress;
+        if (!from) {
+          throw new Error("Connect your wallet to check in.");
+        }
+        const hash = await sendFarcasterCallTransaction({
+          config,
+          chainId: base.id,
+          to: CHECK_IN_ADDRESS,
+          data,
+        });
+        await waitForTransactionReceipt(config, {
+          hash,
+          chainId: base.id,
+        });
+        await completeCheckInOnServer(hash, from);
+        return;
+      }
+
       const client = (await getConnectorClient(config, {
         connector: account.connector,
         ...(host === "baseApp" && connectedAddress
@@ -308,12 +335,6 @@ export default function DailyCheckInQuestButton({
           walletClientChainId: client.chain?.id ?? null,
         });
       }
-
-      // Clean ABI calldata — builder attribution goes only via capabilities.
-      const data = encodeFunctionData({
-        abi: DAILY_CHECK_IN_ABI,
-        functionName: "checkIn",
-      });
 
       const calls = [
         {

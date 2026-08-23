@@ -257,6 +257,25 @@ export async function executeCalls(
     chainId: params.chainId ?? WALLET_REQUIRED_CHAIN_ID,
   });
 
+  if (params.host === "farcaster") {
+    if (params.calls.length !== 1) {
+      throw new WalletError(
+        "METHOD_UNSUPPORTED",
+        "Farcaster host supports a single call per transaction.",
+      );
+    }
+    const call = params.calls[0];
+    const hash = await sendFarcasterCallTransaction({
+      config: params.config,
+      chainId,
+      to: call.to,
+      data: call.data ?? "0x",
+      value: call.value,
+    });
+    await waitForTransactionReceipt(params.config, { hash, chainId });
+    return { hash, callsId: null, method: "eth_sendTransaction" };
+  }
+
   const client = await getHostWalletRequestClient({
     config: params.config,
     chainId,
@@ -652,6 +671,135 @@ async function requestFarcasterHostRpc(params: {
   }
 
   return response.result;
+}
+
+type FarcasterEip1193Provider = {
+  request: (args: {
+    method: string;
+    params?: readonly unknown[];
+  }) => Promise<unknown>;
+};
+
+async function requestFarcasterRawRpc(params: {
+  config: Config;
+  chainId: number;
+  method: string;
+  rpcParams: readonly unknown[];
+}): Promise<unknown> {
+  const { miniAppHost } = (await import("@farcaster/miniapp-sdk")) as {
+    miniAppHost?: FarcasterHostRpc;
+  };
+  const host = miniAppHost;
+
+  if (host?.ethProviderRequestV2 || host?.ethProviderRequest) {
+    return requestFarcasterHostRpc({
+      host,
+      method: params.method,
+      rpcParams: params.rpcParams,
+    });
+  }
+
+  const account = getAccount(params.config);
+  const connector = getActiveConnector(params.config) ?? account.connector;
+  const provider = (await connector?.getProvider({
+    chainId: params.chainId,
+  })) as FarcasterEip1193Provider | undefined;
+
+  if (!provider?.request) {
+    throw new WalletError(
+      "PROVIDER_UNAVAILABLE",
+      "Farcaster wallet provider is unavailable. Reconnect and try again.",
+    );
+  }
+
+  try {
+    return await provider.request({
+      method: params.method,
+      params: params.rpcParams,
+    });
+  } catch (providerError) {
+    if (providerError instanceof WalletError) {
+      throw providerError;
+    }
+    walletLogger.error("farcaster-ethProvider-request-error", {
+      rejection: extractProviderRejection(providerError),
+    });
+    const layers = extractProviderRejection(providerError).layers;
+    const hostLayer = layers[0];
+    throw new WalletError(
+      "TRANSACTION_FAILED",
+      formatHostRpcError(params.method, {
+        code: typeof hostLayer?.code === "number" ? hostLayer.code : undefined,
+        message: hostLayer?.message,
+        details: hostLayer?.details,
+        data: hostLayer?.data,
+      }),
+      providerError,
+    );
+  }
+}
+
+/**
+ * Farcaster contract CALL (check-in, JesseCat mint, etc.).
+ * Same provider + gas path as Deploy, but with `to` and optional `value`.
+ * Never uses viem wallet_sendCalls.
+ */
+export async function sendFarcasterCallTransaction(params: {
+  config: Config;
+  chainId?: number;
+  to: Address;
+  data: Hex;
+  value?: Hex | bigint;
+}): Promise<Hash> {
+  const from = requireConnectedAddress(params.config);
+  const chainId = params.chainId ?? WALLET_REQUIRED_CHAIN_ID;
+  const valueHex =
+    params.value !== undefined ? toHexValue(params.value) : undefined;
+  const includeValue = Boolean(valueHex && valueHex !== "0x0");
+
+  const estimateTx: Record<string, unknown> = {
+    from,
+    to: params.to,
+    data: params.data,
+    ...(includeValue ? { value: valueHex } : {}),
+  };
+
+  let estimatedRaw: unknown;
+  try {
+    estimatedRaw = await requestFarcasterRawRpc({
+      config: params.config,
+      chainId,
+      method: "eth_estimateGas",
+      rpcParams: [estimateTx],
+    });
+  } catch (error) {
+    if (isFarcasterInternalEstimateUnsupported(error)) {
+      return requireTransactionHash(
+        await requestFarcasterRawRpc({
+          config: params.config,
+          chainId,
+          method: "eth_sendTransaction",
+          rpcParams: [estimateTx],
+        }),
+      );
+    }
+    throw error;
+  }
+
+  const gas = applyGasMargin(parseHexQuantity(estimatedRaw));
+  const sendTx = {
+    ...estimateTx,
+    gas,
+  };
+
+  return requireTransactionHash(
+    await requestFarcasterRawRpc({
+      config: params.config,
+      chainId,
+      method: "eth_sendTransaction",
+      rpcParams: [sendTx],
+    }),
+  );
 }
 
 /**
