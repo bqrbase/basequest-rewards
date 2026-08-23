@@ -14,7 +14,7 @@ import {
 import { walletLogger } from "@/lib/wallet/logger";
 import { sendFarcasterCallTransaction } from "@/lib/wallet/TransactionManager";
 import { useWalletHost } from "@/lib/wallet/WalletHostContext";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   encodeFunctionData,
   getAddress,
@@ -23,7 +23,7 @@ import {
   type Hex,
 } from "viem";
 import { base } from "viem/chains";
-import { useAccount, useConfig, type Config } from "wagmi";
+import { useAccount, useConfig, useReadContract, type Config } from "wagmi";
 import {
   getAccount,
   getConnectorClient,
@@ -54,6 +54,22 @@ type WalletRequestClient = {
 const CHECK_IN_ADDRESS = getAddress(DAILY_CHECK_IN_ADDRESS);
 const BASE_CHAIN_ID_HEX = numberToHex(base.id);
 const SEND_CALLS_VERSIONS = ["1.0", "2.0.0"] as const;
+/** Matches DailyCheckIn.sol: `lastCheckIn[msg.sender] + 1 days`. */
+const CHECK_IN_COOLDOWN_SECONDS = 86_400n;
+
+function isAlreadyCheckedInError(error: unknown): boolean {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  return message.includes("already checked in today");
+}
+
+function isEligibleToCheckIn(lastCheckIn: bigint, nowSeconds: bigint): boolean {
+  if (lastCheckIn === 0n) {
+    return true;
+  }
+  return nowSeconds >= lastCheckIn + CHECK_IN_COOLDOWN_SECONDS;
+}
 
 function isUserRejected(message: string): boolean {
   return /user rejected|denied|request denied/i.test(message);
@@ -209,7 +225,7 @@ export default function DailyCheckInQuestButton({
   ctaLabel,
   buttonClassName,
   disabledClassName,
-  disabled = false,
+  disabled: _disabled = false,
   onSuccess,
   onCompleted,
 }: DailyCheckInQuestButtonProps) {
@@ -219,6 +235,47 @@ export default function DailyCheckInQuestButton({
   const { ensureBaseMainnetReady } = useEnsureBaseMainnet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [, setEligibilityTick] = useState(0);
+
+  const {
+    data: lastCheckIn,
+    isFetching: isFetchingLastCheckIn,
+    refetch: refetchLastCheckIn,
+  } = useReadContract({
+    abi: DAILY_CHECK_IN_ABI,
+    address: CHECK_IN_ADDRESS,
+    functionName: "lastCheckIn",
+    args: address ? [address] : undefined,
+    chainId: base.id,
+    query: {
+      enabled: Boolean(address),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  });
+
+  const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+  const eligibleOnchain =
+    lastCheckIn !== undefined && isEligibleToCheckIn(lastCheckIn, nowSeconds);
+  const alreadyCheckedInToday =
+    lastCheckIn !== undefined && !isEligibleToCheckIn(lastCheckIn, nowSeconds);
+
+  useEffect(() => {
+    if (lastCheckIn === undefined || lastCheckIn === 0n) {
+      return;
+    }
+    const eligibleAtMs =
+      Number(lastCheckIn + CHECK_IN_COOLDOWN_SECONDS) * 1000;
+    const delay = eligibleAtMs - Date.now();
+    if (delay <= 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setEligibilityTick((tick) => tick + 1);
+      void refetchLastCheckIn();
+    }, delay + 250);
+    return () => window.clearTimeout(timer);
+  }, [lastCheckIn, refetchLastCheckIn]);
 
   const completeCheckInOnServer = useCallback(
     async (txHash: string, sender: string) => {
@@ -276,7 +333,7 @@ export default function DailyCheckInQuestButton({
   );
 
   const handleCheckIn = useCallback(async () => {
-    if (disabled || isSubmitting) return;
+    if (isSubmitting || alreadyCheckedInToday) return;
     if (walletStatus !== "connected" || !address) {
       setErrorMessage("Connect your wallet to check in.");
       return;
@@ -313,6 +370,7 @@ export default function DailyCheckInQuestButton({
           chainId: base.id,
         });
         await completeCheckInOnServer(hash, from);
+        await refetchLastCheckIn();
         return;
       }
 
@@ -435,6 +493,7 @@ export default function DailyCheckInQuestButton({
           });
         }
         await completeCheckInOnServer(hash, from);
+        await refetchLastCheckIn();
         return;
       }
 
@@ -466,7 +525,13 @@ export default function DailyCheckInQuestButton({
       }
 
       await completeCheckInOnServer(txHash, from);
+      await refetchLastCheckIn();
     } catch (error) {
+      if (isAlreadyCheckedInError(error)) {
+        setErrorMessage(null);
+        await refetchLastCheckIn();
+        return;
+      }
       if (isBaseMainnetSwitchRejected(error)) {
         setErrorMessage(BASE_MAINNET_REQUIRED_MESSAGE);
         return;
@@ -484,16 +549,20 @@ export default function DailyCheckInQuestButton({
     }
   }, [
     address,
+    alreadyCheckedInToday,
     completeCheckInOnServer,
     config,
-    disabled,
     ensureBaseMainnetReady,
     host,
     isSubmitting,
+    refetchLastCheckIn,
     walletStatus,
   ]);
 
-  const buttonDisabled = disabled || isSubmitting;
+  const buttonDisabled =
+    isSubmitting ||
+    alreadyCheckedInToday ||
+    (Boolean(address) && lastCheckIn === undefined && isFetchingLastCheckIn);
 
   return (
     <div className="space-y-2">
@@ -503,8 +572,19 @@ export default function DailyCheckInQuestButton({
         onClick={() => void handleCheckIn()}
         className={`${buttonDisabled ? disabledClassName : buttonClassName} w-full`}
       >
-        {isSubmitting ? "Checking in..." : ctaLabel}
+        {isSubmitting
+          ? "Checking in..."
+          : alreadyCheckedInToday
+            ? "✓ Completed"
+            : eligibleOnchain
+              ? "Check In"
+              : ctaLabel}
       </button>
+      {alreadyCheckedInToday ? (
+        <p className="text-center text-xs text-emerald-200/80">
+          Already checked in today
+        </p>
+      ) : null}
       {errorMessage ? (
         <p className="text-center text-xs text-rose-300/90">{errorMessage}</p>
       ) : null}
