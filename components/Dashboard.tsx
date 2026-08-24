@@ -143,7 +143,7 @@ export default function Dashboard() {
                 quest={quests.find((quest) => quest.id === "claim-nft")}
                 onCompleted={applyServerProgress}
               />
-              <JesseCatMintCard />
+              <JesseCatMintCard onCompleted={applyServerProgress} />
               {exploreBaseQuest ? (
                 <QuestCard
                   questId={exploreBaseQuest.id}
