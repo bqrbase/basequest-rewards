@@ -8,7 +8,7 @@ import { useState } from "react";
 const JESSECAT_MINT_REWARD_XP = 100;
 
 type JesseCatMintCardProps = {
-  onCompleted?: (progress: QuestProgress) => void;
+  onCompleted: (progress: QuestProgress) => void;
 };
 
 /**

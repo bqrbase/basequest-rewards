@@ -21,7 +21,7 @@ import { fetchQuests } from "@/lib/supabase/quests";
 import { fetchUser, userRowToProgress } from "@/lib/supabase/users";
 import { calculateGenesisXP } from "@/lib/genesis/xp";
 import { useGenesisAccess } from "@/hooks/useGenesisAccess";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 
 function maybeCompleteReferral(
@@ -104,6 +104,7 @@ export function useQuestEngine() {
   const isWalletReconnecting =
     walletStatus === "connecting" || walletStatus === "reconnecting";
   const storageWalletAddress = getStorageWalletAddress(address);
+  const progressWriteEpochRef = useRef(0);
 
   useEffect(() => {
     setHydrated(true);
@@ -168,9 +169,13 @@ export function useQuestEngine() {
      * Soft hydrate on connect — sync server progress, then public read / local cache.
      */
     async function hydrateProgress() {
+      const epochAtStart = progressWriteEpochRef.current;
+      const isStale = () =>
+        cancelled || progressWriteEpochRef.current !== epochAtStart;
+
       try {
         const serverProgress = await syncProgressFromServer(walletAddress);
-        if (cancelled) {
+        if (isStale()) {
           return;
         }
         if (serverProgress) {
@@ -183,7 +188,7 @@ export function useQuestEngine() {
         }
 
         const user = await fetchUser(walletAddress);
-        if (cancelled) {
+        if (isStale()) {
           return;
         }
 
@@ -201,7 +206,7 @@ export function useQuestEngine() {
         cacheProgressLocally(fallback, storageWalletAddress);
       } catch (error) {
         console.error("[useQuestEngine] hydrateProgress failed", error);
-        if (cancelled) {
+        if (isStale()) {
           return;
         }
 
@@ -221,6 +226,7 @@ export function useQuestEngine() {
 
   const applyLocalProgress = useCallback(
     (nextProgress: QuestProgress) => {
+      progressWriteEpochRef.current += 1;
       const next = normalizeStreak(nextProgress);
       setProgress(next);
       cacheProgressLocally(next, storageWalletAddress);

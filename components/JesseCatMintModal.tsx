@@ -13,6 +13,10 @@ import {
   BASE_MAINNET_REQUIRED_MESSAGE,
   isBaseMainnetSwitchRejected,
 } from "@/lib/wallet/ensureBaseMainnet";
+import {
+  resolveJesseCatMintSuccessFeedback,
+  type JesseCatMintSuccessFeedback,
+} from "@/lib/jessecat/mintXpFeedback";
 import type { QuestProgress } from "@/lib/quest-engine";
 import { executeCalls } from "@/lib/wallet/TransactionManager";
 import { useWalletHost } from "@/lib/wallet/WalletHostContext";
@@ -23,7 +27,7 @@ import { useAccount, useConfig } from "wagmi";
 type JesseCatMintModalProps = {
   open: boolean;
   onClose: () => void;
-  onCompleted?: (progress: QuestProgress) => void;
+  onCompleted: (progress: QuestProgress) => void;
 };
 
 type ModalStep = "mint" | "success";
@@ -90,6 +94,8 @@ export default function JesseCatMintModal({
   const [isMinting, setIsMinting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<Hash | null>(null);
+  const [successFeedback, setSuccessFeedback] =
+    useState<JesseCatMintSuccessFeedback | null>(null);
 
   const maxQuantity = useMemo(() => resolveMaxQuantity(drop), [drop]);
 
@@ -103,6 +109,7 @@ export default function JesseCatMintModal({
       setIsMinting(false);
       setErrorMessage(null);
       setTxHash(null);
+      setSuccessFeedback(null);
       return;
     }
 
@@ -251,6 +258,8 @@ export default function JesseCatMintModal({
 
       const completeParsed = await readApiJson<{
         success?: boolean;
+        alreadyAwarded?: boolean;
+        awardedXP?: number;
         progress?: QuestProgress;
         error?: string;
         message?: string;
@@ -279,10 +288,13 @@ export default function JesseCatMintModal({
           error: completeParsed.json?.error,
           message: completeParsed.message,
         });
-      } else if (completeParsed.json.progress) {
-        onCompleted?.(completeParsed.json.progress);
       }
 
+      const feedback = resolveJesseCatMintSuccessFeedback(completeParsed.json);
+      if (feedback.applyProgress) {
+        onCompleted(feedback.applyProgress);
+      }
+      setSuccessFeedback(feedback);
       setTxHash(result.hash);
       setStep("success");
     } catch (error) {
@@ -445,10 +457,11 @@ export default function JesseCatMintModal({
                   id={titleId}
                   className="mt-1.5 font-sans text-xl font-bold tracking-tight text-white sm:text-2xl"
                 >
-                  JesseCat minted
+                  {successFeedback?.title ?? "JesseCat minted"}
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-white/55">
-                  Your mint transaction was submitted on Base Mainnet.
+                  {successFeedback?.description ??
+                    "Your mint transaction was submitted on Base Mainnet."}
                 </p>
               </div>
               <button
