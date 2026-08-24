@@ -132,14 +132,30 @@ async function openSeaFetch(path: string, init?: RequestInit): Promise<unknown> 
     cache: "no-store",
   });
 
-  let body: unknown = null;
+  const contentType = response.headers.get("content-type") ?? "";
   const text = await response.text();
-  if (text) {
-    try {
-      body = JSON.parse(text) as unknown;
-    } catch {
-      body = text;
-    }
+  const html =
+    contentType.includes("text/html") || (text.trimStart().startsWith("<") && !text.trimStart().startsWith("{"));
+
+  if (!text.trim()) {
+    throw new Error(
+      `OpenSea request failed (${response.status}): empty response.`,
+    );
+  }
+
+  if (html) {
+    throw new Error(
+      `OpenSea returned HTML instead of JSON (${response.status}).`,
+    );
+  }
+
+  let body: unknown = null;
+  try {
+    body = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      `OpenSea returned a non-JSON response (${response.status}).`,
+    );
   }
 
   if (!response.ok) {

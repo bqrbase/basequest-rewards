@@ -2,6 +2,7 @@
 
 import GlassPanel from "@/components/GlassPanel";
 import { useEnsureBaseMainnet } from "@/hooks/useEnsureBaseMainnet";
+import { readApiJson } from "@/lib/jessecat/readApiJson";
 import {
   getJesseCatBaseScanTxUrl,
   JESSECAT_CONTRACT_ADDRESS,
@@ -12,6 +13,7 @@ import {
   BASE_MAINNET_REQUIRED_MESSAGE,
   isBaseMainnetSwitchRejected,
 } from "@/lib/wallet/ensureBaseMainnet";
+import type { QuestProgress } from "@/lib/quest-engine";
 import { executeCalls } from "@/lib/wallet/TransactionManager";
 import { useWalletHost } from "@/lib/wallet/WalletHostContext";
 import { useEffect, useId, useMemo, useState } from "react";
@@ -21,6 +23,7 @@ import { useAccount, useConfig } from "wagmi";
 type JesseCatMintModalProps = {
   open: boolean;
   onClose: () => void;
+  onCompleted?: (progress: QuestProgress) => void;
 };
 
 type ModalStep = "mint" | "success";
@@ -70,6 +73,7 @@ function resolveMaxQuantity(drop: DropSummary | null): number {
 export default function JesseCatMintModal({
   open,
   onClose,
+  onCompleted,
 }: JesseCatMintModalProps) {
   const titleId = useId();
   const config = useConfig();
@@ -123,22 +127,20 @@ export default function JesseCatMintModal({
           method: "GET",
           credentials: "include",
         });
-        const json = (await response.json()) as {
+        const parsed = await readApiJson<{
           success?: boolean;
           drop?: DropSummary;
           message?: string;
           error?: string;
-        };
+        }>(response, "Unable to load JesseCat drop details.");
         if (cancelled) {
           return;
         }
-        if (!response.ok || !json.success || !json.drop) {
-          setDropError(
-            json.message || json.error || "Unable to load JesseCat drop details.",
-          );
+        if (!parsed.ok || !parsed.json?.success || !parsed.json.drop) {
+          setDropError(parsed.message);
           return;
         }
-        setDrop(json.drop);
+        setDrop(parsed.json.drop);
       } catch (error) {
         if (!cancelled) {
           setDropError(
@@ -195,21 +197,27 @@ export default function JesseCatMintModal({
         }),
       });
 
-      const json = (await response.json()) as MintApiSuccess & {
+      const parsed = await readApiJson<MintApiSuccess & {
         success?: boolean;
         message?: string;
         error?: string;
-      };
+      }>(
+        response,
+        "OpenSea could not build the JesseCat mint transaction.",
+      );
 
-      if (!response.ok || !json.success || !json.to || !json.data || !json.value) {
-        setErrorMessage(
-          json.message ||
-            json.error ||
-            "OpenSea could not build the JesseCat mint transaction.",
-        );
+      if (
+        !parsed.ok ||
+        !parsed.json?.success ||
+        !parsed.json.to ||
+        !parsed.json.data ||
+        !parsed.json.value
+      ) {
+        setErrorMessage(parsed.message);
         return;
       }
 
+      const json = parsed.json;
       const valueWei = BigInt(json.value);
       const result = await executeCalls({
         config,
@@ -226,6 +234,53 @@ export default function JesseCatMintModal({
       if (!result.hash) {
         setErrorMessage("Mint submitted but no transaction hash was returned.");
         return;
+      }
+
+      const completeResponse = await fetch(
+        "/api/quests/jessecat-mint/complete",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            wallet: address,
+            txHash: result.hash,
+          }),
+        },
+      );
+
+      const completeParsed = await readApiJson<{
+        success?: boolean;
+        progress?: QuestProgress;
+        error?: string;
+        message?: string;
+      }>(
+        completeResponse,
+        "Mint confirmed, but XP sync returned an invalid response.",
+      );
+
+      if (!completeParsed.ok || !completeParsed.json?.success) {
+        const verificationFailed =
+          completeParsed.json?.error === "tx_reverted" ||
+          completeParsed.json?.error === "receipt_not_found" ||
+          completeParsed.json?.error === "invalid_tx_hash" ||
+          completeParsed.json?.error === "contract_mismatch";
+        if (verificationFailed) {
+          setErrorMessage(
+            completeParsed.message ||
+              "JesseCat mint could not be confirmed on Base.",
+          );
+          return;
+        }
+
+        console.error("[JesseCatMintModal] jessecat-mint complete failed:", {
+          status: completeParsed.status,
+          contentType: completeParsed.contentType,
+          error: completeParsed.json?.error,
+          message: completeParsed.message,
+        });
+      } else if (completeParsed.json.progress) {
+        onCompleted?.(completeParsed.json.progress);
       }
 
       setTxHash(result.hash);
