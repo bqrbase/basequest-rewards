@@ -18,6 +18,7 @@ type NavItem = {
 const MAIN_NAV: readonly NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
+  { href: "/tasks", label: "Tasks" },
   { href: "/achievements", label: "Achievements" },
   { href: "/referral", label: "Referral" },
   { href: "/rewards", label: "Rewards" },

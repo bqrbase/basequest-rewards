@@ -42,6 +42,7 @@
     "hardhat/**",
     "basequest-genesis",
     "basequest-genesis/**",
-    ".next/dev"
+    ".next/dev",
+    "**/*.test.ts"
   ]
 }
