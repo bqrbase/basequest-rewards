@@ -6,6 +6,7 @@ import DeployContractQuestCard from "@/components/DeployContractQuestCard";
 import BridgeToBaseQuestCard from "@/components/BridgeToBaseQuestCard";
 import FirstSwapQuestCard from "@/components/FirstSwapQuestCard";
 import GlassPanel from "@/components/GlassPanel";
+import JesseCatMintBanner from "@/components/JesseCatMintBanner";
 import JesseCatMintCard from "@/components/JesseCatMintCard";
 import MintGenesisQuestCard from "@/components/MintGenesisQuestCard";
 import X402PaymentQuestCard from "@/components/X402PaymentQuestCard";
@@ -89,7 +90,12 @@ export default function Dashboard() {
   return (
     <PageShell>
       {!hydrated ? (
-        <DashboardSkeleton />
+        <>
+          <div className="-mb-3 w-full sm:-mb-5">
+            <JesseCatMintBanner onCompleted={applyServerProgress} />
+          </div>
+          <DashboardSkeleton />
+        </>
       ) : (
         <>
           {levelUpLevel ? (
@@ -98,6 +104,10 @@ export default function Dashboard() {
               onDismiss={clearLevelUpCelebration}
             />
           ) : null}
+
+          <div className="-mb-3 w-full sm:-mb-5">
+            <JesseCatMintBanner onCompleted={applyServerProgress} />
+          </div>
 
           {/* Onboarding quests — always first, fixed order, never reordered */}
           <section className={ui.dashSection}>
