@@ -184,3 +184,22 @@ export type TaskDetailPayload = TaskMarketplaceItem & {
   joinable: boolean;
   viewerParticipant: Task2EarnParticipant | null;
 };
+
+export type ShareCastRewardEntry = {
+  id: string;
+  claimId: string;
+  rewardType: "share_cast";
+  source: "farcaster_share";
+  referenceId: string;
+  amountBqr: number;
+  status: "pending" | "credited" | "claimed" | "void";
+  castHash: string | null;
+  createdAt: string;
+  creditedAt: string | null;
+};
+
+export type Task2EarnEarnedRewards = {
+  label: "Task2Earn earned BQR (off-chain)";
+  earnedBqr: number;
+  entries: ShareCastRewardEntry[];
+};

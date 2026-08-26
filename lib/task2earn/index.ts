@@ -10,6 +10,8 @@ export {
   TITLE_MAX_LENGTH,
   TITLE_MIN_LENGTH,
   T2E_TEST_TASK_TITLE,
+  SHARE_CAST_REWARD_BQR,
+  T2E_EARNED_BQR_LABEL,
   calculateEqualSplitAmount,
   getCampaignRules,
   isCampaignDuration,
@@ -77,6 +79,8 @@ export type {
   TaskTarget,
   TaskType,
   TokenUsdPrices,
+  Task2EarnEarnedRewards,
+  ShareCastRewardEntry,
   VerificationStatus,
   VerificationType,
 } from "@/lib/task2earn/types";

@@ -2,6 +2,8 @@ import type {
   CreateDraftTaskRequest,
   MiniAppTaskTarget,
   ParticipantStatus,
+  ShareCastRewardEntry,
+  Task2EarnEarnedRewards,
   Task2EarnParticipant,
   Task2EarnTask,
   TaskDetailPayload,
@@ -297,5 +299,76 @@ export async function createDraftTaskRequest(
   return {
     task: json.task,
     usdEstimateUnavailable: Boolean(json.usdEstimateUnavailable),
+  };
+}
+
+export type ShareCastRewardResponse = {
+  alreadyCredited: boolean;
+  amountBqr: number;
+  earnedBqr: number;
+  claimId: string;
+  castHash: string | null;
+  label: string;
+};
+
+export async function requestShareCastReward(
+  taskId: string,
+  wallet: string,
+  castHash?: string | null,
+): Promise<ShareCastRewardResponse> {
+  const response = await fetch(`/api/tasks/${taskId}/share-reward`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      wallet,
+      ...(castHash ? { castHash } : {}),
+    }),
+  });
+  const json = (await response.json()) as {
+    success?: boolean;
+    alreadyCredited?: boolean;
+    amountBqr?: number;
+    earnedBqr?: number;
+    claimId?: string;
+    castHash?: string | null;
+    label?: string;
+    error?: string;
+    reason?: string | null;
+  };
+  if (!response.ok || !json.success) {
+    const detail = json.reason || json.error || "Unable to verify Share Cast";
+    throw new Error(detail);
+  }
+  return {
+    alreadyCredited: Boolean(json.alreadyCredited),
+    amountBqr: Number(json.amountBqr) || 0,
+    earnedBqr: Number(json.earnedBqr) || 0,
+    claimId: json.claimId ?? "",
+    castHash: json.castHash ?? null,
+    label: json.label ?? "Task2Earn earned BQR (off-chain)",
+  };
+}
+
+export async function fetchTask2EarnRewards(
+  wallet: string,
+): Promise<Task2EarnEarnedRewards> {
+  const params = new URLSearchParams({ wallet });
+  const response = await fetch(`/api/tasks/rewards?${params}`, {
+    cache: "no-store",
+  });
+  const json = (await response.json()) as {
+    success?: boolean;
+    label?: Task2EarnEarnedRewards["label"];
+    earnedBqr?: number;
+    entries?: ShareCastRewardEntry[];
+    error?: string;
+  };
+  if (!response.ok || !json.success) {
+    throw new Error(json.error || "Unable to load Task2Earn earned BQR");
+  }
+  return {
+    label: json.label ?? "Task2Earn earned BQR (off-chain)",
+    earnedBqr: Number(json.earnedBqr) || 0,
+    entries: Array.isArray(json.entries) ? json.entries : [],
   };
 }

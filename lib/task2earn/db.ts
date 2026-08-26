@@ -32,6 +32,7 @@ export const T2E_TABLES = {
   claims: "t2e_claims",
   stats: "t2e_stats",
   leaderScores: "t2e_leader_scores",
+  rewardLedger: "t2e_reward_ledger",
 } as const;
 
 export type T2eTableName = (typeof T2E_TABLES)[keyof typeof T2E_TABLES];
@@ -92,6 +93,7 @@ export type T2eShareRow = {
   id: string;
   task_id: string;
   wallet_address: string;
+  fid: number | null;
   share_kind: ShareKind;
   status: ShareStatus;
   cast_hash: string | null;
@@ -100,6 +102,30 @@ export type T2eShareRow = {
   verified_at: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
+};
+
+export type T2eRewardLedgerStatus = "pending" | "credited" | "claimed" | "void";
+
+export type T2eRewardType = "share_cast";
+
+export type T2eRewardSource = "farcaster_share";
+
+export type T2eRewardLedgerRow = {
+  id: string;
+  claim_id: string;
+  wallet_address: string;
+  fid: number;
+  reward_type: T2eRewardType;
+  source: T2eRewardSource;
+  reference_id: string;
+  amount_bqr: string | number;
+  status: T2eRewardLedgerStatus;
+  cast_hash: string | null;
+  share_id: string | null;
+  created_at: string;
+  credited_at: string | null;
+  claimed_at: string | null;
+  tx_hash: string | null;
 };
 
 export type T2ePoolDepositRow = {

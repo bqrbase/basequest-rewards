@@ -564,6 +564,43 @@ export async function fetchUserRepliesPage(params: {
 }
 
 /**
+ * Recent original casts by FID (replies excluded by default).
+ * Used as Share Cast proof fallback when a hash hint is missing or fails.
+ */
+export async function fetchUserCastsPage(params: {
+  fid: number;
+  cursor?: string | null;
+  limit?: number;
+  includeReplies?: boolean;
+}): Promise<unknown | null> {
+  const apiKey = getNeynarApiKey();
+  const url = new URL(`${NEYNAR_API_BASE}/feed/user/casts/`);
+  url.searchParams.set("fid", String(params.fid));
+  url.searchParams.set(
+    "include_replies",
+    params.includeReplies === true ? "true" : "false",
+  );
+  url.searchParams.set(
+    "limit",
+    String(Math.min(50, Math.max(1, params.limit ?? 50))),
+  );
+  if (params.cursor) {
+    url.searchParams.set("cursor", params.cursor);
+  }
+
+  const response = await fetch(url, {
+    headers: neynarHeaders(apiKey),
+    cache: "no-store",
+  });
+  const json: unknown = await response.json();
+  if (!response.ok) {
+    console.error("[neynar] user casts feed failed", { status: response.status });
+    return null;
+  }
+  return json;
+}
+
+/**
  * User bulk lookup. Requests the experimental header so score fields are present
  * when the live API provides them.
  */

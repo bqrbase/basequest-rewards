@@ -36,6 +36,13 @@ export const TITLE_MAX_LENGTH = 80;
 export const DESCRIPTION_MAX_LENGTH = 500;
 export const MAX_PARTICIPANTS_CAP = 1_000_000;
 
+/** Server-wide Phase 1 Share Cast catalog amount. Never taken from the browser. */
+export const SHARE_CAST_REWARD_BQR = 25;
+export const SHARE_CAST_REWARD_TYPE = "share_cast" as const;
+export const SHARE_CAST_REWARD_SOURCE = "farcaster_share" as const;
+export const SHARE_CAST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const T2E_EARNED_BQR_LABEL = "Task2Earn earned BQR (off-chain)";
+
 export function isFollowerMinimum(
   value: number,
 ): value is (typeof FOLLOWER_MINIMUM_OPTIONS)[number] {
