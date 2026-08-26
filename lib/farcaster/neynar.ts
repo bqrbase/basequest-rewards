@@ -302,6 +302,142 @@ export async function searchFarcasterUsers(
   }
 }
 
+export type FarcasterMiniAppSearchResult = {
+  name: string;
+  url: string;
+  iconUrl: string | null;
+  authorUsername: string | null;
+  authorDisplayName: string | null;
+  authorFid: number | null;
+};
+
+type NeynarMiniAppFrame = {
+  title?: string;
+  frames_url?: string;
+  manifest?: {
+    miniapp?: {
+      name?: string;
+      home_url?: string;
+      icon_url?: string;
+    };
+    frame?: {
+      name?: string;
+      home_url?: string;
+      icon_url?: string;
+    };
+  };
+  author?: {
+    fid?: number;
+    username?: string;
+    display_name?: string;
+    displayName?: string;
+  };
+};
+
+function mapSearchMiniApp(
+  frame: NeynarMiniAppFrame | Record<string, unknown>,
+): FarcasterMiniAppSearchResult | null {
+  const raw = frame as NeynarMiniAppFrame;
+  const miniapp = raw.manifest?.miniapp;
+  const legacy = raw.manifest?.frame;
+  const name =
+    miniapp?.name?.trim() ||
+    legacy?.name?.trim() ||
+    raw.title?.trim() ||
+    "";
+  if (!name) {
+    return null;
+  }
+  const url =
+    miniapp?.home_url?.trim() ||
+    legacy?.home_url?.trim() ||
+    raw.frames_url?.trim() ||
+    "";
+  if (!url) {
+    return null;
+  }
+  const fidRaw = raw.author?.fid;
+  const fid = typeof fidRaw === "number" ? fidRaw : Number(fidRaw);
+  return {
+    name,
+    url,
+    iconUrl: miniapp?.icon_url?.trim() || legacy?.icon_url?.trim() || null,
+    authorUsername: raw.author?.username?.trim() || null,
+    authorDisplayName:
+      raw.author?.display_name?.trim() ||
+      raw.author?.displayName?.trim() ||
+      null,
+    authorFid: Number.isInteger(fid) && fid > 0 ? fid : null,
+  };
+}
+
+/**
+ * Search indexed Farcaster Mini Apps by name.
+ * Uses Neynar frame search. Throws on Neynar/network failure so callers
+ * can show an error instead of an empty "no apps" state.
+ */
+export async function searchFarcasterMiniApps(
+  query: string,
+  limit = 8,
+): Promise<FarcasterMiniAppSearchResult[]> {
+  const q = query.trim().slice(0, 32);
+  if (q.length < 2) {
+    return [];
+  }
+
+  const apiKey = getNeynarApiKey();
+  const cappedLimit = Math.min(20, Math.max(1, limit));
+  const url = new URL(`${NEYNAR_API_BASE}/frame/search`);
+  url.searchParams.set("q", q);
+  url.searchParams.set("limit", String(cappedLimit));
+
+  const response = await fetch(url, {
+    headers: neynarHeaders(apiKey),
+    cache: "no-store",
+  });
+  const json = (await readNeynarJson(response)) as {
+    frames?: NeynarMiniAppFrame[];
+    message?: string;
+    code?: string;
+  } | null;
+
+  if (!response.ok) {
+    const message =
+      json && typeof json === "object"
+        ? json.message || json.code
+        : null;
+    console.error("[neynar] frame/search failed", {
+      status: response.status,
+      message,
+    });
+    throw new Error(
+      message || `Farcaster Mini App search failed (${response.status})`,
+    );
+  }
+
+  const frames = Array.isArray(json?.frames) ? json.frames : [];
+  const seen = new Set<string>();
+  const apps: FarcasterMiniAppSearchResult[] = [];
+  for (const frame of frames) {
+    const mapped = mapSearchMiniApp(frame);
+    if (!mapped) {
+      continue;
+    }
+    let normalized: string;
+    try {
+      normalized = new URL(mapped.url).href;
+    } catch {
+      continue;
+    }
+    if (seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    apps.push(mapped);
+  }
+  return apps;
+}
+
 /**
  * Server-side username lookup. FID is taken from Neynar, never from the client.
  */

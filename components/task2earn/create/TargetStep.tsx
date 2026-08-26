@@ -44,6 +44,14 @@ function FarcasterAvatar({
   );
 }
 
+function metadataString(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+): string | null {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 type TargetStepProps = {
   taskType: TaskType;
   castUrl: string;
@@ -64,6 +72,8 @@ type TargetStepProps = {
   onMiniAppUrl: (value: string) => void;
   miniAppName: string;
   onMiniAppName: (value: string) => void;
+  miniAppIconUrl: string | null;
+  onMiniAppIconUrl: (value: string | null) => void;
   miniManual: boolean;
   onMiniManual: (value: boolean) => void;
 };
@@ -88,12 +98,15 @@ export default function TargetStep({
   onMiniAppUrl,
   miniAppName,
   onMiniAppName,
+  miniAppIconUrl,
+  onMiniAppIconUrl,
   miniManual,
   onMiniManual,
 }: TargetStepProps) {
   const [inspectMessage, setInspectMessage] = useState<string | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [debouncedFollowQuery, setDebouncedFollowQuery] = useState("");
+  const [debouncedMiniAppQuery, setDebouncedMiniAppQuery] = useState("");
 
   useEffect(() => {
     const trimmed = followQuery.trim().replace(/^@/, "");
@@ -120,11 +133,30 @@ export default function TargetStep({
     retry: 1,
   });
 
+  useEffect(() => {
+    const trimmed = miniAppQuery.trim();
+    if (miniManual || miniAppUrl) {
+      setDebouncedMiniAppQuery("");
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      setDebouncedMiniAppQuery(trimmed);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [miniAppQuery, miniAppUrl, miniManual]);
+
+  const miniAppSearchReady =
+    taskType === "mini_app" &&
+    !miniManual &&
+    !miniAppUrl &&
+    debouncedMiniAppQuery.length >= SEARCH_MIN_LENGTH;
+
   const appsQuery = useQuery({
-    queryKey: ["t2e-miniapp-search", miniAppQuery],
-    queryFn: () => searchMiniAppsRequest(miniAppQuery),
-    enabled: taskType === "mini_app" && !miniManual && miniAppQuery.trim().length >= 2,
+    queryKey: ["t2e-miniapp-search", debouncedMiniAppQuery],
+    queryFn: () => searchMiniAppsRequest(debouncedMiniAppQuery),
+    enabled: miniAppSearchReady,
     staleTime: 30_000,
+    retry: 1,
   });
 
   if (taskType === "follow") {
@@ -254,61 +286,153 @@ export default function TargetStep({
   }
 
   if (taskType === "mini_app") {
+    const typedQuery = miniAppQuery.trim();
+    const selected = Boolean(miniAppUrl) && !miniManual;
+    const waitingForDebounce =
+      !selected &&
+      typedQuery.length >= SEARCH_MIN_LENGTH &&
+      typedQuery !== debouncedMiniAppQuery;
+    const searching = waitingForDebounce || appsQuery.isFetching;
+    const apps = appsQuery.data ?? [];
+    const showDropdown =
+      !selected && !miniManual && typedQuery.length >= SEARCH_MIN_LENGTH;
+
+    function selectApp(app: MiniAppTaskTarget) {
+      onMiniAppUrl(app.url);
+      onMiniAppName(app.name ?? "");
+      onMiniAppQuery(app.name ?? app.url);
+      onMiniAppIconUrl(metadataString(app.metadata, "iconUrl"));
+    }
+
+    function clearAppSelection() {
+      onMiniAppUrl("");
+      onMiniAppName("");
+      onMiniAppQuery("");
+      onMiniAppIconUrl(null);
+    }
+
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 overflow-visible">
         {!miniManual ? (
           <>
             <label className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-white/45">
               Search Mini App
             </label>
-            <input
-              className={inputClass}
-              value={miniAppQuery}
-              onChange={(event) => onMiniAppQuery(event.target.value)}
-              placeholder="Mini App name"
-              autoComplete="off"
-            />
-            {appsQuery.data && appsQuery.data.length > 0 ? (
-              <ul className="flex flex-col gap-1.5">
-                {appsQuery.data.map((app: MiniAppTaskTarget) => (
-                  <li key={app.url}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onMiniAppUrl(app.url);
-                        onMiniAppName(app.name ?? "");
-                        onMiniAppQuery(app.name ?? app.url);
-                      }}
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left hover:border-cyan-400/30"
-                    >
-                      <p className="text-sm font-semibold text-white">
-                        {app.name ?? app.url}
-                      </p>
-                      <p className="truncate text-[0.65rem] text-white/45">{app.url}</p>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : miniAppQuery.trim().length >= 2 && !appsQuery.isFetching ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-sm text-white/70">Can&apos;t find the app?</p>
+            {selected ? (
+              <div className="flex items-center gap-3 rounded-xl border border-cyan-400/30 bg-white/[0.06] px-3 py-2.5">
+                <FarcasterAvatar
+                  url={miniAppIconUrl}
+                  name={miniAppName || miniAppUrl}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">
+                    {miniAppName || miniAppUrl}
+                  </p>
+                  <p className="truncate text-[0.7rem] text-white/55">
+                    {miniAppUrl}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => onMiniManual(true)}
-                  className="mt-2 text-sm font-semibold text-cyan-200"
+                  onClick={clearAppSelection}
+                  className="shrink-0 rounded-full px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wide text-cyan-100"
                 >
-                  Add URL manually
+                  Change
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => onMiniManual(true)}
-                className="text-left text-sm text-white/50"
-              >
-                Can&apos;t find the app? Add URL manually
-              </button>
+              <div className="relative z-20 overflow-visible">
+                <input
+                  className={inputClass}
+                  value={miniAppQuery}
+                  onChange={(event) => {
+                    if (miniAppUrl) {
+                      clearAppSelection();
+                    }
+                    onMiniAppQuery(event.target.value);
+                  }}
+                  placeholder="Mini App name"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  inputMode="search"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showDropdown}
+                  aria-controls="farcaster-miniapp-results"
+                />
+                {showDropdown ? (
+                  <div
+                    id="farcaster-miniapp-results"
+                    role="listbox"
+                    className="mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#0c1224] shadow-[0_12px_32px_rgba(0,0,0,0.45)] [-webkit-overflow-scrolling:touch]"
+                  >
+                    {searching ? (
+                      <p className="px-3 py-3 text-sm text-white/60">Searching…</p>
+                    ) : appsQuery.isError ? (
+                      <p className="px-3 py-3 text-sm text-rose-200">
+                        {appsQuery.error instanceof Error
+                          ? appsQuery.error.message
+                          : "Unable to search Farcaster Mini Apps. Try again."}
+                      </p>
+                    ) : apps.length === 0 ? (
+                      <p className="px-3 py-3 text-sm text-white/60">
+                        No apps found
+                      </p>
+                    ) : (
+                      <ul className="flex flex-col py-1">
+                        {apps.map((app: MiniAppTaskTarget) => {
+                          const iconUrl = metadataString(app.metadata, "iconUrl");
+                          const authorUsername = metadataString(
+                            app.metadata,
+                            "authorUsername",
+                          );
+                          const authorDisplayName = metadataString(
+                            app.metadata,
+                            "authorDisplayName",
+                          );
+                          const secondary = authorUsername
+                            ? `@${authorUsername} · ${app.url}`
+                            : authorDisplayName
+                              ? `${authorDisplayName} · ${app.url}`
+                              : app.url;
+                          return (
+                            <li key={app.url} role="option">
+                              <button
+                                type="button"
+                                onClick={() => selectApp(app)}
+                                className="flex min-h-12 w-full items-center gap-3 px-3 py-3 text-left text-white [touch-action:manipulation] hover:bg-white/[0.06] active:bg-white/[0.1]"
+                              >
+                                <FarcasterAvatar
+                                  url={iconUrl}
+                                  name={app.name || app.url}
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-semibold">
+                                    {app.name || app.url}
+                                  </span>
+                                  <span className="mt-0.5 block truncate text-[0.7rem] text-white/55">
+                                    {secondary}
+                                  </span>
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             )}
+            <button
+              type="button"
+              onClick={() => onMiniManual(true)}
+              className="text-left text-sm text-white/50"
+            >
+              Can&apos;t find the app? Add URL manually
+            </button>
           </>
         ) : (
           <>
@@ -343,6 +467,9 @@ export default function TargetStep({
                     if (result.target.name) {
                       onMiniAppName(result.target.name);
                     }
+                    onMiniAppIconUrl(
+                      metadataString(result.target.metadata, "iconUrl"),
+                    );
                     setInspectMessage(
                       "URL inspected only. Opening this Mini App has not been verified.",
                     );

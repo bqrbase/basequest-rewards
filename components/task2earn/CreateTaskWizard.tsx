@@ -75,7 +75,7 @@ function previewTarget(params: {
       kind: "mini_app",
       name: params.miniAppName.trim() || url.hostname,
       url: url.toString(),
-      appId: null,
+      appId: url.hostname,
       metadata: {},
     };
   }
@@ -106,6 +106,7 @@ export default function CreateTaskWizard() {
   const [miniAppQuery, setMiniAppQuery] = useState("");
   const [miniAppUrl, setMiniAppUrl] = useState("");
   const [miniAppName, setMiniAppName] = useState("");
+  const [miniAppIconUrl, setMiniAppIconUrl] = useState<string | null>(null);
   const [miniManual, setMiniManual] = useState(false);
   const [minFollowers, setMinFollowers] = useState<number | null>(null);
   const [minNeynar, setMinNeynar] = useState(0);
@@ -183,7 +184,9 @@ export default function CreateTaskWizard() {
       if (needsMiniAppTarget(taskType)) {
         return isPublicHttpsUrl(miniAppUrl)
           ? null
-          : "Enter or select a Mini App URL";
+          : miniManual
+            ? "Enter a public https Mini App URL"
+            : "Select a Mini App from the search results";
       }
       if (needsCastTarget(taskType)) {
         return parseFarcasterCastUrl(castUrl)
@@ -337,6 +340,8 @@ export default function CreateTaskWizard() {
               onMiniAppUrl={setMiniAppUrl}
               miniAppName={miniAppName}
               onMiniAppName={setMiniAppName}
+              miniAppIconUrl={miniAppIconUrl}
+              onMiniAppIconUrl={setMiniAppIconUrl}
               miniManual={miniManual}
               onMiniManual={setMiniManual}
             />

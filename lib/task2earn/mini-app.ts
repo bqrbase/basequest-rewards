@@ -1,3 +1,7 @@
+import {
+  searchFarcasterMiniApps,
+  type FarcasterMiniAppSearchResult,
+} from "@/lib/farcaster/neynar";
 import { isPublicHttpsUrl } from "@/lib/task2earn/target";
 import type { MiniAppTaskTarget } from "@/lib/task2earn/types";
 
@@ -8,15 +12,6 @@ export type MiniAppInspectResult = {
   /** URL was fetched/parsed. Does not mean the Mini App was opened. */
   urlInspected: boolean;
   openVerified: false;
-};
-
-type CatalogEntry = {
-  name?: string;
-  url?: string;
-  homeUrl?: string;
-  home_url?: string;
-  domain?: string;
-  id?: string;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -136,82 +131,47 @@ export async function inspectMiniAppUrl(raw: string): Promise<MiniAppInspectResu
   };
 }
 
-function catalogUrl(entry: CatalogEntry): string | null {
-  const raw = pickString(entry.homeUrl, entry.home_url, entry.url);
-  if (raw && isPublicHttpsUrl(raw)) {
-    return isPublicHttpsUrl(raw)!.toString();
+function toMiniAppTarget(
+  app: FarcasterMiniAppSearchResult,
+): MiniAppTaskTarget | null {
+  const parsed = isPublicHttpsUrl(app.url);
+  if (!parsed) {
+    return null;
   }
-  if (entry.domain && isPublicHttpsUrl(`https://${entry.domain}`)) {
-    return `https://${entry.domain}`;
-  }
-  return null;
-}
-
-function asCatalogList(payload: unknown): CatalogEntry[] {
-  if (Array.isArray(payload)) {
-    return payload as CatalogEntry[];
-  }
-  const record = asRecord(payload);
-  if (!record) {
-    return [];
-  }
-  const nested =
-    record.miniapps ??
-    record.mini_apps ??
-    record.frames ??
-    record.apps ??
-    record.items;
-  return Array.isArray(nested) ? (nested as CatalogEntry[]) : [];
+  return {
+    kind: "mini_app",
+    name: app.name,
+    url: parsed.toString(),
+    appId: parsed.hostname,
+    metadata: {
+      iconUrl: app.iconUrl,
+      authorUsername: app.authorUsername,
+      authorDisplayName: app.authorDisplayName,
+      authorFid: app.authorFid,
+    },
+  };
 }
 
 /**
- * Best-effort name search. Empty results are expected when no catalog is available.
+ * Name/URL search for Mini App targets.
+ * Name queries use Neynar Mini App search. Throws on Neynar/network failure.
+ * URL/domain queries inspect the public https origin only.
  */
 export async function searchMiniApps(query: string): Promise<MiniAppTaskTarget[]> {
-  const q = query.trim().toLowerCase();
-  if (q.length < 2) {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) {
     return [];
   }
 
-  if (q.includes("://") || q.includes(".")) {
+  if (trimmed.includes("://") || trimmed.includes(".")) {
     const inspected = await inspectMiniAppUrl(
-      q.includes("://") ? query.trim() : `https://${query.trim()}`,
+      trimmed.includes("://") ? trimmed : `https://${trimmed}`,
     );
     return inspected.target ? [inspected.target] : [];
   }
 
-  const catalogs = [
-    "https://api.farcaster.xyz/v2/discover-mini-apps",
-    "https://client.farcaster.xyz/v2/mini-apps",
-  ];
-
-  for (const catalog of catalogs) {
-    const payload = await fetchJson(catalog);
-    const matches = asCatalogList(payload)
-      .map((entry) => {
-        const url = catalogUrl(entry);
-        const name = pickString(entry.name);
-        if (!url || !name) {
-          return null;
-        }
-        if (!name.toLowerCase().includes(q)) {
-          return null;
-        }
-        const target: MiniAppTaskTarget = {
-          kind: "mini_app",
-          name,
-          url,
-          appId: pickString(entry.id),
-          metadata: { catalog },
-        };
-        return target;
-      })
-      .filter((entry): entry is MiniAppTaskTarget => Boolean(entry))
-      .slice(0, 8);
-    if (matches.length > 0) {
-      return matches;
-    }
-  }
-
-  return [];
+  const apps = await searchFarcasterMiniApps(trimmed, 8);
+  return apps
+    .map(toMiniAppTarget)
+    .filter((app): app is MiniAppTaskTarget => Boolean(app));
 }

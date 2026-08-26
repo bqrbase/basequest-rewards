@@ -210,17 +210,36 @@ export async function searchMiniAppsRequest(
   query: string,
 ): Promise<MiniAppTaskTarget[]> {
   const params = new URLSearchParams({ q: query });
+  let json: {
+    success?: boolean;
+    apps?: MiniAppTaskTarget[];
+    error?: string;
+  } = {};
   const response = await fetch(`/api/tasks/search-mini-apps?${params}`, {
     cache: "no-store",
   });
-  const json = (await response.json()) as {
-    success?: boolean;
-    apps?: MiniAppTaskTarget[];
-  };
-  if (!response.ok || !json.success) {
-    return [];
+  try {
+    json = (await response.json()) as typeof json;
+  } catch {
+    throw new Error(
+      `Unable to search Farcaster Mini Apps (${response.status || "network"})`,
+    );
   }
-  return json.apps ?? [];
+  if (!response.ok || json.success === false) {
+    throw new Error(
+      json.error || `Unable to search Farcaster Mini Apps (${response.status})`,
+    );
+  }
+  const apps = Array.isArray(json.apps) ? json.apps : [];
+  return apps.filter((app): app is MiniAppTaskTarget => {
+    return (
+      app?.kind === "mini_app" &&
+      typeof app.url === "string" &&
+      app.url.startsWith("https://") &&
+      typeof app.name === "string" &&
+      app.name.trim().length > 0
+    );
+  });
 }
 
 export async function inspectMiniAppRequest(url: string): Promise<{
