@@ -28,20 +28,62 @@ export type FarcasterUserSearchResult = {
   pfpUrl: string | null;
 };
 
-function mapSearchUser(user: NeynarUser): FarcasterUserSearchResult | null {
-  if (typeof user.fid !== "number" || user.fid <= 0) {
+function mapSearchUser(user: NeynarUser | Record<string, unknown>): FarcasterUserSearchResult | null {
+  const raw = user as NeynarUser & {
+    displayName?: string;
+    pfpUrl?: string;
+    pfp?: { url?: string };
+  };
+  const fid = typeof raw.fid === "number" ? raw.fid : Number(raw.fid);
+  if (!Number.isInteger(fid) || fid <= 0) {
     return null;
   }
-  const username = user.username?.trim();
+  const username =
+    typeof raw.username === "string" ? raw.username.trim() : "";
   if (!username) {
     return null;
   }
+  const displayName =
+    raw.display_name?.trim() ||
+    (typeof raw.displayName === "string" ? raw.displayName.trim() : "") ||
+    null;
+  const pfpUrl =
+    raw.pfp_url?.trim() ||
+    (typeof raw.pfpUrl === "string" ? raw.pfpUrl.trim() : "") ||
+    raw.pfp?.url?.trim() ||
+    null;
   return {
-    fid: user.fid,
+    fid,
     username,
-    displayName: user.display_name?.trim() || null,
-    pfpUrl: user.pfp_url?.trim() || null,
+    displayName,
+    pfpUrl,
   };
+}
+
+function extractSearchUsers(payload: unknown): NeynarUser[] {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+  const root = payload as {
+    result?: { users?: unknown };
+    users?: unknown;
+  };
+  const users = root.result?.users ?? root.users;
+  return Array.isArray(users) ? (users as NeynarUser[]) : [];
+}
+
+async function readNeynarJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text.trim()) {
+    return null;
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error(
+      `Neynar returned non-JSON (${response.status})`,
+    );
+  }
 }
 
 function neynarHeaders(apiKey: string, experimental = false): HeadersInit {
@@ -183,8 +225,9 @@ function hasNeynarKey(): boolean {
 
 /**
  * Search Farcaster users by username/display name.
- * Never trusts a client FID. Throws on Neynar/network failure so callers
- * can show an error instead of an empty "no users" state.
+ * Neynar search max `limit` is 10. Never trusts a client FID.
+ * Throws on Neynar/network failure so callers can show an error instead
+ * of an empty "no users" state. Exact-username lookup is used as fallback.
  */
 export async function searchFarcasterUsers(
   query: string,
@@ -196,35 +239,67 @@ export async function searchFarcasterUsers(
   }
 
   const apiKey = getNeynarApiKey();
-  const url = new URL(`${NEYNAR_API_BASE}/user/search/`);
+  const cappedLimit = Math.min(10, Math.max(1, limit));
+  const url = new URL(`${NEYNAR_API_BASE}/user/search`);
   url.searchParams.set("q", q);
-  url.searchParams.set("limit", String(Math.min(20, Math.max(1, limit))));
+  url.searchParams.set("limit", String(cappedLimit));
 
-  const response = await fetch(url, {
-    headers: neynarHeaders(apiKey),
-    cache: "no-store",
-  });
-
-  const json = (await response.json()) as {
-    result?: { users?: NeynarUser[] };
-    users?: NeynarUser[];
-    message?: string;
-  };
-
-  if (!response.ok) {
-    console.error("[neynar] user/search failed", {
-      status: response.status,
-      message: json.message,
+  try {
+    const response = await fetch(url, {
+      headers: neynarHeaders(apiKey),
+      cache: "no-store",
     });
-    throw new Error(
-      json.message || `Farcaster user search failed (${response.status})`,
-    );
-  }
+    const json = (await readNeynarJson(response)) as {
+      result?: { users?: NeynarUser[] };
+      users?: NeynarUser[];
+      message?: string;
+      code?: string;
+    } | null;
 
-  const users = json.result?.users ?? json.users ?? [];
-  return users
-    .map(mapSearchUser)
-    .filter((user): user is FarcasterUserSearchResult => Boolean(user));
+    if (!response.ok) {
+      const message =
+        json && typeof json === "object"
+          ? json.message || json.code
+          : null;
+      console.error("[neynar] user/search failed", {
+        status: response.status,
+        message,
+      });
+      const searched = await lookupFarcasterUserByUsername(q);
+      if (searched) {
+        return [searched];
+      }
+      throw new Error(
+        message || `Farcaster user search failed (${response.status})`,
+      );
+    }
+
+    const users = extractSearchUsers(json)
+      .map(mapSearchUser)
+      .filter((user): user is FarcasterUserSearchResult => Boolean(user));
+    const hasExact = users.some(
+      (user) => user.username.toLowerCase() === q.toLowerCase(),
+    );
+    if (hasExact) {
+      return users;
+    }
+    const exact = await lookupFarcasterUserByUsername(q);
+    if (exact) {
+      return [exact, ...users];
+    }
+    return users;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Farcaster user search failed")) {
+      throw error;
+    }
+    const exact = await lookupFarcasterUserByUsername(q);
+    if (exact) {
+      return [exact];
+    }
+    throw error instanceof Error
+      ? error
+      : new Error("Farcaster user search failed");
+  }
 }
 
 /**

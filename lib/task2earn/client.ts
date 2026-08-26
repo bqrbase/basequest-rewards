@@ -171,25 +171,39 @@ export async function searchFarcasterUsersRequest(
   query: string,
 ): Promise<FarcasterUserOption[]> {
   const params = new URLSearchParams({ q: query });
-  const response = await fetch(`/api/tasks/search-users?${params}`, {
-    cache: "no-store",
-  });
-  const json = (await response.json()) as {
+  let json: {
     success?: boolean;
     users?: FarcasterUserOption[];
     error?: string;
-  };
-  if (!response.ok || !json.success) {
-    throw new Error(json.error || "Unable to search Farcaster users");
+  } = {};
+  const response = await fetch(`/api/tasks/search-users?${params}`, {
+    cache: "no-store",
+  });
+  try {
+    json = (await response.json()) as typeof json;
+  } catch {
+    throw new Error(
+      `Unable to search Farcaster users (${response.status || "network"})`,
+    );
   }
-  return (Array.isArray(json.users) ? json.users : []).filter(
-    (user): user is FarcasterUserOption =>
-      typeof user.fid === "number" &&
-      Number.isInteger(user.fid) &&
-      user.fid > 0 &&
+  if (!response.ok || json.success === false) {
+    throw new Error(
+      json.error || `Unable to search Farcaster users (${response.status})`,
+    );
+  }
+  const users = Array.isArray(json.users) ? json.users : [];
+  return users.filter((user): user is FarcasterUserOption => {
+    const fid = typeof user.fid === "number" ? user.fid : Number(user.fid);
+    return (
+      Number.isInteger(fid) &&
+      fid > 0 &&
       typeof user.username === "string" &&
-      user.username.trim().length > 0,
-  );
+      user.username.trim().length > 0
+    );
+  }).map((user) => ({
+    ...user,
+    fid: typeof user.fid === "number" ? user.fid : Number(user.fid),
+  }));
 }
 
 export async function searchMiniAppsRequest(

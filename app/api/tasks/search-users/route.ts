@@ -1,6 +1,22 @@
 import { searchFarcasterUsers } from "@/lib/farcaster/neynar";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function publicSearchError(error: unknown): string {
+  if (!(error instanceof Error) || !error.message.trim()) {
+    return "Unable to search Farcaster users";
+  }
+  if (error.message.includes("NEYNAR_API_KEY")) {
+    return "Neynar is not configured on the server (NEYNAR_API_KEY)";
+  }
+  return error.message.replace(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+    "[redacted]",
+  );
+}
+
 /**
  * GET /api/tasks/search-users?q=
  * Username/display-name search for Follow Only targets.
@@ -31,7 +47,7 @@ export async function GET(request: Request) {
       {
         success: false,
         users: [],
-        error: "Unable to search Farcaster users",
+        error: publicSearchError(error),
       },
       { status: 502 },
     );

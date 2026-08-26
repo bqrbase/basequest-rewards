@@ -211,7 +211,9 @@ export default function TargetStep({
                   <p className="px-3 py-3 text-sm text-white/60">Searching…</p>
                 ) : usersQuery.isError ? (
                   <p className="px-3 py-3 text-sm text-rose-200">
-                    Unable to search Farcaster users. Try again.
+                    {usersQuery.error instanceof Error
+                      ? usersQuery.error.message
+                      : "Unable to search Farcaster users. Try again."}
                   </p>
                 ) : users.length === 0 ? (
                   <p className="px-3 py-3 text-sm text-white/60">
