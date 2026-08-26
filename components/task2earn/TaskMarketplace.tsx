@@ -2,47 +2,75 @@
 
 import TaskCard from "@/components/task2earn/TaskCard";
 import TaskFilters, {
-  type MarketplaceSection,
+  type MarketplaceStatusFilter,
 } from "@/components/task2earn/TaskFilters";
+import { MarketplaceSubNav } from "@/components/task2earn/TaskNav";
 import { fetchMarketplaceTasks, joinTaskRequest } from "@/lib/task2earn/client";
-import { parseNumericAmount } from "@/lib/task2earn/display";
+import { isJoinableStatus } from "@/lib/task2earn/display";
 import type { TaskMarketplaceItem } from "@/lib/task2earn/types";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useAccount } from "wagmi";
 
-function sortTasks(
-  tasks: TaskMarketplaceItem[],
-  section: MarketplaceSection,
-): TaskMarketplaceItem[] {
-  const copy = [...tasks];
-  switch (section) {
-    case "popular":
-      return copy.sort(
-        (a, b) =>
-          b.participantCount - a.participantCount ||
-          Date.parse(b.createdAt) - Date.parse(a.createdAt),
-      );
-    case "new":
-      return copy.sort(
-        (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-      );
-    case "ending":
-      return copy.sort((a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt));
-    case "rewards":
-      return copy.sort(
-        (a, b) =>
-          parseNumericAmount(b.poolUsdValue) - parseNumericAmount(a.poolUsdValue) ||
-          parseNumericAmount(b.poolAmount) - parseNumericAmount(a.poolAmount),
-      );
+function marketplaceStatus(
+  task: TaskMarketplaceItem,
+): MarketplaceStatusFilter {
+  if (isJoinableStatus(task.status, task.endsAt)) {
+    return "ongoing";
   }
+  if (task.verifiedCount > 0) {
+    return "completed";
+  }
+  return "ended";
+}
+
+function filterTasks(
+  tasks: TaskMarketplaceItem[],
+  status: MarketplaceStatusFilter,
+): TaskMarketplaceItem[] {
+  return tasks.filter((task) => marketplaceStatus(task) === status);
+}
+
+function CreateTaskCta() {
+  return (
+    <Link
+      href="/tasks/create"
+      className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-[0.82rem] font-bold uppercase tracking-[0.14em] text-white shadow-[0_10px_28px_rgba(124,58,237,0.45),0_0_24px_rgba(0,82,255,0.28)] ring-1 ring-violet-200/25 transition-all duration-150 hover:-translate-y-px hover:shadow-[0_14px_32px_rgba(124,58,237,0.55)] active:translate-y-px active:scale-[0.99]"
+    >
+      ✨ CREATE TASK
+    </Link>
+  );
+}
+
+function EmptyState({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-4 text-center">
+      <p className="text-xl leading-none" aria-hidden>
+        🎯
+      </p>
+      <p className="mt-1.5 text-sm font-bold text-white">{title}</p>
+      <p className="mt-0.5 text-[0.75rem] text-white/50">{subtitle}</p>
+      <Link
+        href="/tasks/create"
+        className="mt-2.5 inline-flex min-h-9 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-base-blue px-4 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-white shadow-[0_8px_18px_rgba(124,58,237,0.35)]"
+      >
+        CREATE TASK
+      </Link>
+    </div>
+  );
 }
 
 export default function TaskMarketplace() {
   const { address, status } = useAccount();
   const wallet = status === "connected" && address ? address : null;
-  const [section, setSection] = useState<MarketplaceSection>("popular");
+  const [section, setSection] = useState<MarketplaceStatusFilter>("ongoing");
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
   const [joinHint, setJoinHint] = useState<string | null>(null);
@@ -55,7 +83,7 @@ export default function TaskMarketplace() {
   });
 
   const tasks = tasksQuery.data ?? [];
-  const visible = sortTasks(tasks, section);
+  const visible = filterTasks(tasks, section);
 
   const onJoin = useCallback(
     async (taskId: string) => {
@@ -87,60 +115,46 @@ export default function TaskMarketplace() {
     [tasksQuery, wallet],
   );
 
+  let body;
   if (tasksQuery.isPending) {
-    return (
-      <div className="grid grid-cols-1 gap-2.5">
+    body = (
+      <div className="grid grid-cols-1 gap-2">
         {Array.from({ length: 2 }, (_, index) => (
           <div
             key={index}
-            className="min-h-[10.5rem] animate-pulse rounded-2xl border border-white/8 bg-white/[0.04]"
+            className="min-h-[7.5rem] animate-pulse rounded-2xl border border-white/8 bg-white/[0.04]"
           />
         ))}
       </div>
     );
-  }
-
-  if (tasksQuery.isError) {
-    return (
+  } else if (tasksQuery.isError) {
+    body = (
       <p className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-3 text-sm text-rose-100">
         {tasksQuery.error instanceof Error
           ? tasksQuery.error.message
           : "Unable to load tasks"}
       </p>
     );
-  }
-
-  if (tasks.length === 0) {
-    return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5 text-center">
-        <p className="text-2xl" aria-hidden>
-          🎯
-        </p>
-        <p className="mt-1.5 text-base font-bold text-white">
-          No live tasks yet
-        </p>
-        <p className="mt-1 text-[0.8rem] text-white/55">
-          Be the first to launch a campaign.
-        </p>
-        <Link
-          href="/tasks/create"
-          className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-gradient-to-r from-base-blue via-[#3b6cff] to-indigo-600 px-5 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-white shadow-[0_8px_20px_rgba(0,82,255,0.35)]"
-        >
-          ✨ CREATE TASK
-        </Link>
-      </div>
+  } else if (tasks.length === 0 || visible.length === 0) {
+    body = (
+      <EmptyState
+        title={
+          section === "ongoing" || tasks.length === 0
+            ? "No live tasks yet"
+            : section === "completed"
+              ? "No completed tasks yet"
+              : "No ended tasks yet"
+        }
+        subtitle={
+          section === "ongoing" || tasks.length === 0
+            ? "Be the first to launch a campaign."
+            : "Check Ongoing for live campaigns."
+        }
+      />
     );
-  }
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      <TaskFilters active={section} onChange={setSection} />
-      {joinHint ? (
-        <p className="text-[0.7rem] text-cyan-100/80" role="status">
-          {joinHint}
-        </p>
-      ) : null}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+  } else {
+    body = (
+      <div className="grid grid-cols-1 gap-2">
         {visible.map((task) => (
           <TaskCard
             key={task.id}
@@ -151,6 +165,20 @@ export default function TaskMarketplace() {
           />
         ))}
       </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <CreateTaskCta />
+      <MarketplaceSubNav />
+      <TaskFilters active={section} onChange={setSection} />
+      {joinHint ? (
+        <p className="text-[0.7rem] text-cyan-100/80" role="status">
+          {joinHint}
+        </p>
+      ) : null}
+      {body}
     </div>
   );
 }
