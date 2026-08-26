@@ -118,8 +118,13 @@ export type TaskCastShareInput = {
 
 export function shareRewardsCastText(): string {
   return [
-    "Earn daily BQR on BaseQuest Rewards 🎯",
-    "Share this Mini App, then verify to unlock today's off-chain reward.",
+    "Just unlocked my BQR rewards 🚀",
+    "━━━━━━━━━━━━━━━━━━━━━━",
+    "💎 Total Reward Pool: 10,000 BQR",
+    "⚡ Daily drops: 25 BQR per user",
+    "🎁 Free · Daily · Instant reward",
+    "━━━━━━━━━━━━━━━━━━━━━━",
+    "👇 Claim your free BQR now — don't miss today's drop!",
   ].join("\n");
 }
 

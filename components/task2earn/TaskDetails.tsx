@@ -130,7 +130,7 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center">
         <p className="font-semibold text-white">Task not found</p>
-        <Link href="/tasks" className="mt-3 inline-block text-sm text-cyan-200">
+        <Link href="/tasks/browse" className="mt-3 inline-block text-sm text-cyan-200">
           Back to marketplace
         </Link>
       </div>
@@ -144,7 +144,7 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href="/tasks" className="text-[0.75rem] font-medium text-cyan-200/80">
+      <Link href="/tasks/browse" className="text-[0.75rem] font-medium text-cyan-200/80">
         ← Marketplace
       </Link>
 

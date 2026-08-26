@@ -12,6 +12,7 @@ import {
   canonicalTaskUrl,
   farcasterComposeUrl,
   scoreSnapText,
+  shareRewardsCastText,
   taskCastText,
 } from "./share.ts";
 
@@ -81,6 +82,15 @@ describe("Mini App share URLs", () => {
 });
 
 describe("share copy", () => {
+  it("uses standalone BQR Share Rewards copy without a task URL", () => {
+    const text = shareRewardsCastText();
+    assert.equal(text.includes("Just unlocked my BQR rewards 🚀"), true);
+    assert.equal(text.includes("Total Reward Pool: 10,000 BQR"), true);
+    assert.equal(text.includes("Daily drops: 25 BQR per user"), true);
+    assert.equal(text.includes("Claim your free BQR now"), true);
+    assert.equal(text.includes("/tasks/"), false);
+  });
+
   it("promotes the specific Task2Earn campaign with pool and duration", () => {
     const text = taskCastText(CAST_INPUT);
     assert.equal(text.includes("Join this Task2Earn: Follow @hqcrp 🚀"), true);

@@ -59,7 +59,7 @@ export default function TaskNav() {
 }
 
 const SUB_NAV = [
-  { href: "/tasks", label: "Tasks" },
+  { href: "/tasks/browse", label: "Tasks" },
   { href: "/tasks/leaders", label: "Board" },
   { href: "/tasks/me", label: "My Tasks" },
 ] as const;
@@ -74,9 +74,7 @@ export function MarketplaceSubNav() {
     >
       {SUB_NAV.map((item) => {
         const active =
-          item.href === "/tasks"
-            ? pathname === "/tasks"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}

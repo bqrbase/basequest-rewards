@@ -193,9 +193,11 @@ export default function ShareRewardsCard() {
           </span>
           <div className="min-w-0">
             <h2 className="font-sans text-base font-bold text-white">
-              BQR Rewards
+              BQR Share Rewards
             </h2>
-            <p className="text-[0.72rem] text-white/50">Daily BQR rewards</p>
+            <p className="text-[0.72rem] text-white/50">
+              Free · Daily · Instant reward
+            </p>
           </div>
         </div>
         <span
@@ -212,12 +214,9 @@ export default function ShareRewardsCard() {
         </span>
       </div>
 
-      <div className="relative mt-3">
-        <p className="text-[0.58rem] font-bold uppercase tracking-[0.16em] text-amber-200/70">
-          Total reward pool
-        </p>
-        <p className="mt-1 font-sans text-[1.65rem] font-bold leading-none tracking-tight text-white">
-          {formatBqr(campaign.poolRemainingBqr)}
+      <div className="relative mt-3 rounded-xl border border-amber-300/15 bg-black/30 px-3 py-3">
+        <p className="whitespace-pre-line text-[0.8rem] leading-relaxed text-white/90">
+          {shareRewardsCastText()}
         </p>
       </div>
 
