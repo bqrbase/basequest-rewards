@@ -24,6 +24,10 @@ export const FARCASTER_MINIAPP_SHARE_ACTIONS = [
   "openMiniApp",
 ] as const;
 
+export function canonicalAppUrl(): string {
+  return MINI_APP_ORIGIN;
+}
+
 export function canonicalTaskUrl(taskId?: string): string {
   const id = taskId?.trim();
   if (!id) {
@@ -111,6 +115,13 @@ export type TaskCastShareInput = {
   poolAmount: string;
   durationDays: number;
 };
+
+export function shareRewardsCastText(): string {
+  return [
+    "Earn daily BQR on BaseQuest Rewards 🎯",
+    "Share this Mini App, then verify to unlock today's off-chain reward.",
+  ].join("\n");
+}
 
 export function taskCastText(input: TaskCastShareInput | string): string {
   if (typeof input === "string") {

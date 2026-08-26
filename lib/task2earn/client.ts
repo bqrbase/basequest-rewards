@@ -10,6 +10,7 @@ import type {
   TaskMarketplaceItem,
   TokenUsdPrices,
 } from "@/lib/task2earn/types";
+import type { ShareRewardsCampaign } from "@/lib/task2earn/share-rewards-display";
 import { mapVerifyError } from "@/lib/task2earn/verification-ui";
 
 export type TaskVerificationCheck = {
@@ -370,5 +371,65 @@ export async function fetchTask2EarnRewards(
     label: json.label ?? "Task2Earn earned BQR (off-chain)",
     earnedBqr: Number(json.earnedBqr) || 0,
     entries: Array.isArray(json.entries) ? json.entries : [],
+  };
+}
+
+export async function fetchShareRewardsCampaign(
+  wallet?: string | null,
+): Promise<ShareRewardsCampaign> {
+  const params = new URLSearchParams();
+  if (wallet) {
+    params.set("wallet", wallet);
+  }
+  const query = params.toString();
+  const response = await fetch(
+    `/api/tasks/share-rewards${query ? `?${query}` : ""}`,
+    { cache: "no-store" },
+  );
+  const json = (await response.json()) as {
+    success?: boolean;
+    campaign?: ShareRewardsCampaign;
+    error?: string;
+  };
+  if (!response.ok || !json.success || !json.campaign) {
+    throw new Error(json.error || "Unable to load BQR Share Rewards");
+  }
+  return json.campaign;
+}
+
+export async function verifyDailyShareRewardRequest(
+  wallet: string,
+  castHash?: string | null,
+): Promise<{
+  alreadyClaimed: boolean;
+  verified: boolean;
+  campaign: ShareRewardsCampaign;
+  castHash: string | null;
+}> {
+  const response = await fetch("/api/tasks/share-rewards", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      wallet,
+      ...(castHash ? { castHash } : {}),
+    }),
+  });
+  const json = (await response.json()) as {
+    success?: boolean;
+    alreadyClaimed?: boolean;
+    verified?: boolean;
+    campaign?: ShareRewardsCampaign;
+    castHash?: string | null;
+    error?: string;
+    reason?: string | null;
+  };
+  if (!response.ok || !json.success || !json.campaign) {
+    throw new Error(json.reason || json.error || "Unable to verify share");
+  }
+  return {
+    alreadyClaimed: Boolean(json.alreadyClaimed),
+    verified: Boolean(json.verified),
+    campaign: json.campaign,
+    castHash: json.castHash ?? null,
   };
 }

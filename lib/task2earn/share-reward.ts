@@ -3,7 +3,7 @@ import {
   fetchUserCastsPage,
   lookupFidByWalletAddress,
 } from "@/lib/farcaster/neynar";
-import { canonicalTaskUrl } from "@/lib/miniapp/share";
+import { canonicalAppUrl, canonicalTaskUrl } from "@/lib/miniapp/share";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { logSupabaseError } from "@/lib/supabase/errors";
 import {
@@ -22,9 +22,15 @@ import {
   evaluateShareCastEligibility,
   existingCreditedShare,
   mapLedgerEntry,
+  parseShareRewardRequest,
   shareCastClaimId,
   sumCreditedBqr,
 } from "@/lib/task2earn/share-reward-logic";
+import {
+  buildShareRewardsCampaign,
+  latestCreditedAt,
+  type ShareRewardsCampaign,
+} from "@/lib/task2earn/share-rewards-display";
 import {
   evaluateShareCastProof,
   extractFeedCursor,
@@ -66,8 +72,8 @@ function isUniqueViolation(error: unknown): boolean {
 
 async function proveShareCast(params: {
   fid: number;
-  taskId: string;
-  taskCreatedAt: string;
+  expectedUrl: string;
+  notBeforeMs: number;
   hashHint?: string | null;
   nowMs?: number;
 }): Promise<
@@ -76,8 +82,8 @@ async function proveShareCast(params: {
 > {
   const rules = {
     expectedFid: params.fid,
-    taskUrl: canonicalTaskUrl(params.taskId),
-    taskCreatedAtMs: Date.parse(params.taskCreatedAt),
+    taskUrl: params.expectedUrl,
+    taskCreatedAtMs: params.notBeforeMs,
     nowMs: params.nowMs ?? Date.now(),
   };
   if (!Number.isFinite(rules.taskCreatedAtMs)) {
@@ -386,8 +392,8 @@ export async function creditShareCastReward(params: {
 
   const proof = await proveShareCast({
     fid,
-    taskId: task.id,
-    taskCreatedAt: task.createdAt,
+    expectedUrl: canonicalTaskUrl(task.id),
+    notBeforeMs: Date.parse(task.createdAt),
     hashHint: params.castHashHint,
   });
   if (!proof.ok) {
@@ -441,5 +447,151 @@ export async function listWalletShareRewards(
     label: T2E_EARNED_BQR_LABEL,
     earnedBqr: sumCreditedBqr(credited),
     entries: credited.map(mapLedgerEntry),
+  };
+}
+
+function isMissingLedgerError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message).toLowerCase() : "";
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    message.includes("t2e_reward_ledger") ||
+    message.includes("does not exist") ||
+    message.includes("schema cache")
+  );
+}
+
+async function sumAllCreditedShareCastBqr(): Promise<number> {
+  const supabase = requireAdmin();
+  const { data, error } = await supabase
+    .from(T2E_TABLES.rewardLedger)
+    .select("amount_bqr, status")
+    .eq("reward_type", SHARE_CAST_REWARD_TYPE)
+    .eq("status", "credited");
+  if (error) {
+    if (isMissingLedgerError(error)) {
+      return 0;
+    }
+    logSupabaseError("sumAllCreditedShareCastBqr", "select ledger", error);
+    throw error;
+  }
+  return sumCreditedBqr(data ?? []);
+}
+
+export async function getShareRewardsCampaign(
+  walletAddress?: string | null,
+): Promise<ShareRewardsCampaign> {
+  try {
+    const creditedPoolBqr = await sumAllCreditedShareCastBqr();
+    if (!walletAddress) {
+      return buildShareRewardsCampaign({
+        creditedPoolBqr,
+        earnedBqr: 0,
+        lastCreditedAt: null,
+      });
+    }
+    const rows = await loadLedgerForWallet(walletAddress);
+    const credited = rows.filter((row) => row.status === "credited");
+    return buildShareRewardsCampaign({
+      creditedPoolBqr,
+      earnedBqr: sumCreditedBqr(credited),
+      lastCreditedAt: latestCreditedAt(rows),
+    });
+  } catch (error) {
+    if (isMissingLedgerError(error)) {
+      return buildShareRewardsCampaign({
+        creditedPoolBqr: 0,
+        earnedBqr: 0,
+        lastCreditedAt: null,
+      });
+    }
+    throw error;
+  }
+}
+
+export type VerifyDailyShareResult =
+  | {
+      ok: true;
+      alreadyClaimed: boolean;
+      verified: boolean;
+      campaign: ShareRewardsCampaign;
+      castHash: string | null;
+    }
+  | {
+      ok: false;
+      error: string;
+      status: number;
+      reason?: ShareCastProofReason;
+      campaign?: ShareRewardsCampaign;
+    };
+
+export async function verifyDailyShareReward(params: {
+  walletAddress: string;
+  castHashHint?: string | null;
+}): Promise<VerifyDailyShareResult> {
+  const parsed = parseShareRewardRequest({
+    wallet: params.walletAddress,
+    castHash: params.castHashHint,
+  });
+  if (!parsed.wallet) {
+    return { ok: false, error: "valid_wallet_required", status: 400 };
+  }
+
+  let fid: number | null = null;
+  try {
+    fid = await lookupFidByWalletAddress(parsed.wallet);
+  } catch (error) {
+    console.error("[task2earn] FID lookup failed during daily share verify", error);
+    return { ok: false, error: "unfetchable", status: 503, reason: "unfetchable" };
+  }
+  if (!fid || !Number.isInteger(fid) || fid <= 0) {
+    return { ok: false, error: "farcaster_required", status: 400 };
+  }
+
+  const campaign = await getShareRewardsCampaign(parsed.wallet);
+  if (campaign.claimedToday) {
+    return {
+      ok: true,
+      alreadyClaimed: true,
+      verified: true,
+      campaign,
+      castHash: null,
+    };
+  }
+  if (!campaign.live) {
+    return {
+      ok: false,
+      error: "pool_depleted",
+      status: 409,
+      campaign,
+    };
+  }
+
+  const proof = await proveShareCast({
+    fid,
+    expectedUrl: canonicalAppUrl(),
+    notBeforeMs: 0,
+    hashHint: parsed.castHashHint,
+  });
+  if (!proof.ok) {
+    return {
+      ok: false,
+      error: "proof_failed",
+      status: 422,
+      reason: proof.reason,
+      campaign,
+    };
+  }
+
+  return {
+    ok: true,
+    alreadyClaimed: false,
+    verified: true,
+    campaign,
+    castHash: proof.cast.hash,
   };
 }
