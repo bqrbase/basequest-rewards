@@ -183,14 +183,15 @@ function hasNeynarKey(): boolean {
 
 /**
  * Search Farcaster users by username/display name.
- * Returns [] when Neynar is unavailable — never trusts a client FID.
+ * Never trusts a client FID. Throws on Neynar/network failure so callers
+ * can show an error instead of an empty "no users" state.
  */
 export async function searchFarcasterUsers(
   query: string,
   limit = 8,
 ): Promise<FarcasterUserSearchResult[]> {
   const q = query.trim().replace(/^@/, "");
-  if (q.length < 2 || !hasNeynarKey()) {
+  if (q.length < 2) {
     return [];
   }
 
@@ -215,7 +216,9 @@ export async function searchFarcasterUsers(
       status: response.status,
       message: json.message,
     });
-    return [];
+    throw new Error(
+      json.message || `Farcaster user search failed (${response.status})`,
+    );
   }
 
   const users = json.result?.users ?? json.users ?? [];
@@ -254,6 +257,28 @@ export async function lookupFarcasterUserByUsername(
   }
 
   return mapSearchUser(json.user);
+}
+
+/**
+ * Server-side FID lookup. FID is taken from Neynar, never from the client.
+ */
+export async function lookupFarcasterUserByFid(
+  fid: number,
+): Promise<FarcasterUserSearchResult | null> {
+  if (!Number.isInteger(fid) || fid <= 0 || !hasNeynarKey()) {
+    return null;
+  }
+
+  const payload = await fetchUsersByFids([fid]);
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const users = (payload as { users?: NeynarUser[] }).users;
+  if (!Array.isArray(users)) {
+    return null;
+  }
+  const user = users.find((entry) => entry.fid === fid);
+  return user ? mapSearchUser(user) : null;
 }
 
 export type NeynarCastQuery = {

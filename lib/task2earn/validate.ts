@@ -45,6 +45,7 @@ export type SanitizedCreateDraft = {
     kind: "cast" | "follow" | "mini_app";
     url?: string;
     username?: string;
+    fid?: number;
     name?: string;
   };
   shareCastEnabled: boolean;
@@ -52,6 +53,19 @@ export type SanitizedCreateDraft = {
 };
 
 const POOL_AMOUNT_RE = /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/;
+
+function parsePositiveFid(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const parsed = Number(value.trim());
+    if (Number.isInteger(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
 
 export function sanitizeAudience(input: unknown): AudienceRules {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -203,7 +217,7 @@ export function sanitizeCreateDraftInput(
       if (!isValidFarcasterUsername(username)) {
         errors.push({
           field: "target",
-          message: "Enter a Farcaster username to follow",
+          message: "Select a Farcaster account to follow",
         });
       }
     } else if (needsMiniAppTarget(taskTypeRaw)) {
@@ -245,6 +259,7 @@ export function sanitizeCreateDraftInput(
         username: typeof targetRaw.username === "string"
           ? normalizeFarcasterUsername(targetRaw.username)
           : undefined,
+        fid: parsePositiveFid(targetRaw.fid),
         name: typeof targetRaw.name === "string" ? targetRaw.name.trim() : undefined,
       },
       shareCastEnabled: raw.shareCastEnabled !== false,

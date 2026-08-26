@@ -1,4 +1,5 @@
 import {
+  lookupFarcasterUserByFid,
   lookupFarcasterUserByUsername,
   lookupFidByWalletAddress,
   fetchUsersByFids,
@@ -399,26 +400,36 @@ async function resolveTaskTarget(
 
   if (input.targetInput.kind === "follow") {
     const username = input.targetInput.username ?? "";
+    const requestedFid = input.targetInput.fid;
     if (!username) {
-      return { error: "Enter a Farcaster username to follow" };
+      return { error: "Select a Farcaster account to follow" };
     }
-    let fid: number | null = null;
-    let displayName: string | null = null;
     try {
+      if (typeof requestedFid === "number" && requestedFid > 0) {
+        const byFid = await lookupFarcasterUserByFid(requestedFid);
+        if (byFid) {
+          return {
+            kind: "follow",
+            username: byFid.username,
+            fid: byFid.fid,
+            displayName: byFid.displayName,
+          };
+        }
+      }
       const user = await lookupFarcasterUserByUsername(username);
       if (user) {
-        fid = user.fid;
-        displayName = user.displayName;
+        return {
+          kind: "follow",
+          username: user.username,
+          fid: user.fid,
+          displayName: user.displayName,
+        };
       }
     } catch (error) {
-      console.error("[task2earn] follow username lookup failed", error);
+      console.error("[task2earn] follow account lookup failed", error);
+      return { error: "Unable to resolve the selected Farcaster account. Try again." };
     }
-    return {
-      kind: "follow",
-      username,
-      fid,
-      displayName,
-    };
+    return { error: "Select a real Farcaster account from search results" };
   }
 
   const inspected = await inspectMiniAppUrl(input.targetInput.url ?? "");

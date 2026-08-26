@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 
 /**
  * GET /api/tasks/search-users?q=
- * Username search for Follow Only targets. Does not accept or return proof of FID.
+ * Username/display-name search for Follow Only targets.
+ * Returns Neynar-resolved profile fields including FID for UI selection.
+ * FID in this response is not accepted as proof on create.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -17,6 +19,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       users: users.map((user) => ({
+        fid: user.fid,
         username: user.username,
         displayName: user.displayName,
         pfpUrl: user.pfpUrl,
@@ -24,6 +27,13 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("[api/tasks/search-users] GET failed", error);
-    return NextResponse.json({ success: true, users: [] });
+    return NextResponse.json(
+      {
+        success: false,
+        users: [],
+        error: "Unable to search Farcaster users",
+      },
+      { status: 502 },
+    );
   }
 }

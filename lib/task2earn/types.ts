@@ -102,6 +102,8 @@ export type CreateDraftTaskRequest = {
     kind?: string;
     url?: string;
     username?: string;
+    /** Selection hint only. Server re-resolves via Neynar and never treats this as proof. */
+    fid?: number;
     name?: string;
   };
   shareCastEnabled?: boolean;

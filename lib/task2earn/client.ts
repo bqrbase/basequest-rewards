@@ -17,6 +17,7 @@ export type TaskVerificationCheck = {
 };
 
 export type FarcasterUserOption = {
+  fid: number;
   username: string;
   displayName: string | null;
   pfpUrl: string | null;
@@ -176,11 +177,19 @@ export async function searchFarcasterUsersRequest(
   const json = (await response.json()) as {
     success?: boolean;
     users?: FarcasterUserOption[];
+    error?: string;
   };
   if (!response.ok || !json.success) {
-    return [];
+    throw new Error(json.error || "Unable to search Farcaster users");
   }
-  return json.users ?? [];
+  return (Array.isArray(json.users) ? json.users : []).filter(
+    (user): user is FarcasterUserOption =>
+      typeof user.fid === "number" &&
+      Number.isInteger(user.fid) &&
+      user.fid > 0 &&
+      typeof user.username === "string" &&
+      user.username.trim().length > 0,
+  );
 }
 
 export async function searchMiniAppsRequest(

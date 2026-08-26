@@ -156,7 +156,13 @@ export default function ReviewStep({
         This creates an off-chain task draft. No tokens will be transferred.
       </p>
 
-      <ShareActions title={title || "Task2Earn draft"} compact={false} />
+      <ShareActions
+        title={title || "Task2Earn draft"}
+        rewardToken={rewardToken}
+        poolAmount={poolAmount}
+        durationDays={durationDays}
+        compact={false}
+      />
     </div>
   );
 }

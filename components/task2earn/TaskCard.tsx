@@ -94,6 +94,9 @@ export default function TaskCard({
           <ShareActions
             taskId={task.id}
             title={task.title}
+            rewardToken={task.rewardToken}
+            poolAmount={task.poolAmount}
+            durationDays={task.durationDays}
             shareCastEnabled={task.shareCastEnabled}
             shareSnapEnabled={task.shareSnapEnabled}
             shareCastRewardBqr={task.shareCastRewardBqr}

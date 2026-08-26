@@ -3,7 +3,6 @@ const STEPS = [
   "Cast / Mini App",
   "Audience",
   "Reward",
-  "Details",
   "Review",
 ] as const;
 

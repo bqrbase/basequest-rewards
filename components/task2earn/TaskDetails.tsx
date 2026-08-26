@@ -241,6 +241,9 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
       <ShareActions
         taskId={task.id}
         title={task.title}
+        rewardToken={task.rewardToken}
+        poolAmount={task.poolAmount}
+        durationDays={task.durationDays}
         shareCastEnabled={task.shareCastEnabled}
         shareSnapEnabled={task.shareSnapEnabled}
         shareCastRewardBqr={task.shareCastRewardBqr}

@@ -2,7 +2,6 @@
 
 import ConnectWalletButton from "@/components/ConnectWalletButton";
 import AudienceStep from "@/components/task2earn/create/AudienceStep";
-import DetailsStep from "@/components/task2earn/create/DetailsStep";
 import ReviewStep from "@/components/task2earn/create/ReviewStep";
 import RewardStep from "@/components/task2earn/create/RewardStep";
 import TargetStep from "@/components/task2earn/create/TargetStep";
@@ -12,7 +11,8 @@ import CreateTaskStepper, {
 } from "@/components/task2earn/CreateTaskStepper";
 import ShareActions from "@/components/task2earn/ShareActions";
 import { createDraftTaskRequest, fetchTaskPrices } from "@/lib/task2earn/client";
-import { getCampaignRules } from "@/lib/task2earn/constants";
+import { getCampaignRules, TITLE_MAX_LENGTH } from "@/lib/task2earn/constants";
+import { TASK_TYPE_LABELS } from "@/lib/task2earn/display";
 import {
   isPublicHttpsUrl,
   isValidFarcasterUsername,
@@ -21,12 +21,11 @@ import {
   needsMiniAppTarget,
   normalizeFarcasterUsername,
   parseFarcasterCastUrl,
+  formatTaskTargetSummary,
 } from "@/lib/task2earn/target";
 import {
   parsePoolAmount,
   sanitizeAudience,
-  validateDescription,
-  validateMaxParticipants,
   validateTitle,
 } from "@/lib/task2earn/validate";
 import type {
@@ -42,24 +41,29 @@ import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 
 const GLASS =
-  "rounded-2xl border border-white/10 bg-[linear-gradient(160deg,rgba(18,10,36,0.92),rgba(8,16,36,0.88))] p-4 shadow-[0_12px_32px_rgba(0,0,0,0.35)]";
+  "overflow-visible rounded-2xl border border-white/10 bg-[linear-gradient(160deg,rgba(18,10,36,0.92),rgba(8,16,36,0.88))] p-4 shadow-[0_12px_32px_rgba(0,0,0,0.35)]";
 
 function previewTarget(params: {
   taskType: TaskType;
   castUrl: string;
   followUsername: string;
+  followFid: number | null;
+  followDisplayName: string | null;
   miniAppUrl: string;
   miniAppName: string;
 }): TaskTarget | null {
   if (needsFollowTarget(params.taskType)) {
-    if (!isValidFarcasterUsername(params.followUsername)) {
+    if (
+      params.followFid === null ||
+      !isValidFarcasterUsername(params.followUsername)
+    ) {
       return null;
     }
     return {
       kind: "follow",
       username: normalizeFarcasterUsername(params.followUsername),
-      fid: null,
-      displayName: null,
+      fid: params.followFid,
+      displayName: params.followDisplayName,
     };
   }
   if (needsMiniAppTarget(params.taskType)) {
@@ -78,6 +82,16 @@ function previewTarget(params: {
   return parseFarcasterCastUrl(params.castUrl);
 }
 
+function campaignTitle(taskType: TaskType, target: TaskTarget | null): string {
+  const typeLabel = TASK_TYPE_LABELS[taskType];
+  const summary = formatTaskTargetSummary(target);
+  const combined =
+    summary && summary !== "Not set" ? `${typeLabel} ${summary}` : typeLabel;
+  return combined.length > TITLE_MAX_LENGTH
+    ? combined.slice(0, TITLE_MAX_LENGTH)
+    : combined;
+}
+
 export default function CreateTaskWizard() {
   const { address, status } = useAccount();
   const wallet = status === "connected" && address ? address : null;
@@ -86,6 +100,9 @@ export default function CreateTaskWizard() {
   const [castUrl, setCastUrl] = useState("");
   const [followQuery, setFollowQuery] = useState("");
   const [followUsername, setFollowUsername] = useState("");
+  const [followFid, setFollowFid] = useState<number | null>(null);
+  const [followDisplayName, setFollowDisplayName] = useState<string | null>(null);
+  const [followPfpUrl, setFollowPfpUrl] = useState<string | null>(null);
   const [miniAppQuery, setMiniAppQuery] = useState("");
   const [miniAppUrl, setMiniAppUrl] = useState("");
   const [miniAppName, setMiniAppName] = useState("");
@@ -98,9 +115,6 @@ export default function CreateTaskWizard() {
   const [rewardToken, setRewardToken] = useState<RewardToken>("BQR");
   const [poolAmount, setPoolAmount] = useState("");
   const [durationDays, setDurationDays] = useState<CampaignDuration>(1);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<Task2EarnTask | null>(null);
@@ -133,11 +147,14 @@ export default function CreateTaskWizard() {
     ? previewTarget({
         taskType,
         castUrl,
-        followUsername: followUsername || followQuery,
+        followUsername,
+        followFid,
+        followDisplayName,
         miniAppUrl,
         miniAppName,
       })
     : null;
+  const title = taskType ? campaignTitle(taskType, target) : "";
 
   const stepLabels = CREATE_TASK_STEPS.map((label, index) => {
     if (index !== 1 || !taskType) {
@@ -158,9 +175,8 @@ export default function CreateTaskWizard() {
     }
     if (current === 1 && taskType) {
       if (needsFollowTarget(taskType)) {
-        const username = followUsername || followQuery;
-        if (!isValidFarcasterUsername(username)) {
-          return "Enter or select a Farcaster account";
+        if (followFid === null || !isValidFarcasterUsername(followUsername)) {
+          return "Select a Farcaster account from the search results";
         }
         return null;
       }
@@ -190,28 +206,10 @@ export default function CreateTaskWizard() {
       }
       return null;
     }
-    if (current === 4) {
-      const titleError = validateTitle(title);
-      if (titleError) {
-        return titleError;
-      }
-      const descriptionError = validateDescription(description);
-      if (descriptionError) {
-        return descriptionError;
-      }
-      const maxParsed = validateMaxParticipants(maxParticipants);
-      if (maxParsed && typeof maxParsed === "object") {
-        return maxParsed.error;
-      }
-      return null;
-    }
     return null;
   }
 
   function goNext() {
-    if (step === 1 && taskType && needsFollowTarget(taskType) && !followUsername) {
-      setFollowUsername(normalizeFarcasterUsername(followQuery));
-    }
     const message = validateStep(step);
     if (message) {
       setError(message);
@@ -234,7 +232,7 @@ export default function CreateTaskWizard() {
       validateStep(0) ??
       validateStep(1) ??
       validateStep(3) ??
-      validateStep(4);
+      validateTitle(title);
     if (lastError) {
       setError(lastError);
       return;
@@ -242,24 +240,21 @@ export default function CreateTaskWizard() {
     setSubmitting(true);
     setError(null);
     try {
-      const maxParsed = validateMaxParticipants(maxParticipants);
       const result = await createDraftTaskRequest({
         wallet,
         taskType,
         title,
-        description,
+        description: "",
         rewardToken,
         poolAmount,
         durationDays,
-        maxParticipants:
-          maxParsed && typeof maxParsed === "object" ? undefined : maxParsed,
+        maxParticipants: null,
         audience,
         target: needsFollowTarget(taskType)
           ? {
               kind: "follow",
-              username: normalizeFarcasterUsername(
-                followUsername || followQuery,
-              ),
+              username: normalizeFarcasterUsername(followUsername),
+              fid: followFid ?? undefined,
             }
           : needsMiniAppTarget(taskType)
             ? { kind: "mini_app", url: miniAppUrl, name: miniAppName }
@@ -284,7 +279,13 @@ export default function CreateTaskWizard() {
           Off-chain draft only. Not funded yet. No tokens were transferred.
         </p>
         <div className="mt-4">
-          <ShareActions taskId={created.id} title={created.title} />
+          <ShareActions
+            taskId={created.id}
+            title={created.title}
+            rewardToken={created.rewardToken}
+            poolAmount={created.poolAmount}
+            durationDays={created.durationDays}
+          />
         </div>
         <div className="mt-4 flex gap-2">
           <Link
@@ -324,6 +325,12 @@ export default function CreateTaskWizard() {
               onFollowQuery={setFollowQuery}
               followUsername={followUsername}
               onFollowUsername={setFollowUsername}
+              followFid={followFid}
+              onFollowFid={setFollowFid}
+              followDisplayName={followDisplayName}
+              onFollowDisplayName={setFollowDisplayName}
+              followPfpUrl={followPfpUrl}
+              onFollowPfpUrl={setFollowPfpUrl}
               miniAppQuery={miniAppQuery}
               onMiniAppQuery={setMiniAppQuery}
               miniAppUrl={miniAppUrl}
@@ -360,17 +367,7 @@ export default function CreateTaskWizard() {
               endsAt={endsAt}
             />
           ) : null}
-          {step === 4 ? (
-            <DetailsStep
-              title={title}
-              onTitle={setTitle}
-              description={description}
-              onDescription={setDescription}
-              maxParticipants={maxParticipants}
-              onMaxParticipants={setMaxParticipants}
-            />
-          ) : null}
-          {step === 5 && taskType ? (
+          {step === 4 && taskType ? (
             <ReviewStep
               taskType={taskType}
               target={target}
