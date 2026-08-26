@@ -51,8 +51,20 @@ export function canonicalScoreShareImageUrl(): string {
   return `${MINI_APP_ORIGIN}/share-cards/score-share.png`;
 }
 
-export function farcasterComposeUrl(text: string, embedUrl: string): string {
-  return `${FARCASTER_COMPOSE_BASE}?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(embedUrl)}`;
+/** Static standalone BQR Share Rewards preview — not a task or score card. */
+export function canonicalShareRewardsImageUrl(): string {
+  return `${MINI_APP_ORIGIN}/images/bqr-share-rewards.png`;
+}
+
+export function farcasterComposeUrl(
+  text: string,
+  embedUrl: string,
+  imageUrl?: string,
+): string {
+  const embeds = imageUrl
+    ? `&embeds[]=${encodeURIComponent(embedUrl)}&embeds[]=${encodeURIComponent(imageUrl)}`
+    : `&embeds[]=${encodeURIComponent(embedUrl)}`;
+  return `${FARCASTER_COMPOSE_BASE}?text=${encodeURIComponent(text)}${embeds}`;
 }
 
 export type MiniAppEmbedActionType = "launch_miniapp" | "launch_frame";

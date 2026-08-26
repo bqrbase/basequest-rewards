@@ -6,8 +6,10 @@ import {
   MINI_APP_EMBED_IMAGE,
   buildMiniAppEmbed,
   buildMiniAppEmbedTags,
+  canonicalAppUrl,
   canonicalScoreShareImageUrl,
   canonicalScoreUrl,
+  canonicalShareRewardsImageUrl,
   canonicalTaskShareImageUrl,
   canonicalTaskUrl,
   farcasterComposeUrl,
@@ -89,6 +91,19 @@ describe("share copy", () => {
     assert.equal(text.includes("Daily drops: 25 BQR per user"), true);
     assert.equal(text.includes("Claim your free BQR now"), true);
     assert.equal(text.includes("/tasks/"), false);
+  });
+
+  it("attaches the promotional image and canonical Mini App URL, not a task URL", () => {
+    const image = canonicalShareRewardsImageUrl();
+    const appUrl = canonicalAppUrl();
+    assert.equal(image, "https://basequest.online/images/bqr-share-rewards.png");
+    assert.equal(appUrl, "https://basequest.online");
+    assert.equal(image.includes("/tasks/"), false);
+    assert.notEqual(image, canonicalTaskShareImageUrl(TASK_ID));
+    const compose = farcasterComposeUrl(shareRewardsCastText(), appUrl, image);
+    assert.equal(compose.includes(encodeURIComponent(appUrl)), true);
+    assert.equal(compose.includes(encodeURIComponent(image)), true);
+    assert.equal(compose.includes(encodeURIComponent(`/tasks/${TASK_ID}`)), false);
   });
 
   it("promotes the specific Task2Earn campaign with pool and duration", () => {

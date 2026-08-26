@@ -8,6 +8,7 @@ import { formatShareRewardCountdown, buildShareRewardsCampaign } from "@/lib/tas
 import type { ShareRewardsCampaign } from "@/lib/task2earn/share-rewards-display";
 import {
   canonicalAppUrl,
+  canonicalShareRewardsImageUrl,
   farcasterComposeUrl,
   shareRewardsCastText,
 } from "@/lib/miniapp/share";
@@ -18,6 +19,7 @@ import { useAccount } from "wagmi";
 async function openShareCastComposer(
   text: string,
   embedUrl: string,
+  imageUrl: string,
 ): Promise<{ openedInMiniApp: boolean; hash: string | null }> {
   try {
     const { sdk } = await import("@farcaster/miniapp-sdk");
@@ -26,7 +28,7 @@ async function openShareCastComposer(
       return { openedInMiniApp: false, hash: null };
     }
     if (typeof sdk.actions.composeCast === "function") {
-      const embeds: [string] = [embedUrl];
+      const embeds: [string, string] = [embedUrl, imageUrl];
       const result = (await sdk.actions.composeCast({
         text,
         embeds,
@@ -37,7 +39,7 @@ async function openShareCastComposer(
           : null;
       return { openedInMiniApp: true, hash };
     }
-    await sdk.actions.openUrl(farcasterComposeUrl(text, embedUrl));
+    await sdk.actions.openUrl(farcasterComposeUrl(text, embedUrl, imageUrl));
     return { openedInMiniApp: true, hash: null };
   } catch {
     return { openedInMiniApp: false, hash: null };
@@ -150,10 +152,15 @@ export default function ShareRewardsCard() {
     const composed = await openShareCastComposer(
       shareRewardsCastText(),
       canonicalAppUrl(),
+      canonicalShareRewardsImageUrl(),
     );
     if (!composed.openedInMiniApp) {
       window.open(
-        farcasterComposeUrl(shareRewardsCastText(), canonicalAppUrl()),
+        farcasterComposeUrl(
+          shareRewardsCastText(),
+          canonicalAppUrl(),
+          canonicalShareRewardsImageUrl(),
+        ),
         "_blank",
         "noopener,noreferrer",
       );
