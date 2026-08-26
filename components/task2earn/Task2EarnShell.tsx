@@ -1,12 +1,18 @@
 import PageShell from "@/components/PageShell";
 import TaskNav from "@/components/task2earn/TaskNav";
 import UnfundedNotice from "@/components/task2earn/UnfundedNotice";
+import type { ReactNode } from "react";
 
 type Task2EarnShellProps = {
-  children: React.ReactNode;
+  children: ReactNode;
+  /** Marketplace-only chrome rendered above the shared Task2Earn nav. */
+  beforeNav?: ReactNode;
 };
 
-export default function Task2EarnShell({ children }: Task2EarnShellProps) {
+export default function Task2EarnShell({
+  children,
+  beforeNav,
+}: Task2EarnShellProps) {
   return (
     <PageShell>
       <div className="relative isolate">
@@ -20,6 +26,7 @@ export default function Task2EarnShell({ children }: Task2EarnShellProps) {
         </div>
         <div className="relative flex flex-col gap-4">
           <UnfundedNotice />
+          {beforeNav}
           <TaskNav />
           {children}
         </div>

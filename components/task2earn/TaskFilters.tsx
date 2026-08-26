@@ -20,24 +20,32 @@ type TaskFiltersProps = {
 
 export default function TaskFilters({ active, onChange }: TaskFiltersProps) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {SECTIONS.map((section) => {
-        const selected = section.id === active;
-        return (
-          <button
-            key={section.id}
-            type="button"
-            onClick={() => onChange(section.id)}
-            className={`inline-flex min-h-9 shrink-0 items-center rounded-full border px-3 text-[0.72rem] font-semibold ${
-              selected
-                ? "border-fuchsia-400/40 bg-fuchsia-500/20 text-fuchsia-100"
-                : "border-white/10 bg-white/[0.04] text-white/60"
-            }`}
-          >
-            {section.label}
-          </button>
-        );
-      })}
+    <div
+      role="tablist"
+      aria-label="Sort tasks"
+      className="flex rounded-full border border-white/10 bg-black/25 p-0.5"
+    >
+      <div className="flex w-full gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {SECTIONS.map((section) => {
+          const selected = section.id === active;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => onChange(section.id)}
+              className={`inline-flex min-h-8 flex-1 shrink-0 items-center justify-center rounded-full px-2.5 text-[0.65rem] font-semibold tracking-wide transition-colors sm:text-[0.7rem] ${
+                selected
+                  ? "bg-white/15 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+                  : "text-white/45 hover:text-white/80"
+              }`}
+            >
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

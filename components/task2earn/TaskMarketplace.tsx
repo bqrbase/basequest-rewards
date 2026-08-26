@@ -2,7 +2,6 @@
 
 import TaskCard from "@/components/task2earn/TaskCard";
 import TaskFilters, {
-  MARKETPLACE_SECTION_LABELS,
   type MarketplaceSection,
 } from "@/components/task2earn/TaskFilters";
 import { fetchMarketplaceTasks, joinTaskRequest } from "@/lib/task2earn/client";
@@ -90,11 +89,11 @@ export default function TaskMarketplace() {
 
   if (tasksQuery.isPending) {
     return (
-      <div className="grid grid-cols-1 gap-3">
-        {Array.from({ length: 3 }, (_, index) => (
+      <div className="grid grid-cols-1 gap-2.5">
+        {Array.from({ length: 2 }, (_, index) => (
           <div
             key={index}
-            className="min-h-[12rem] animate-pulse rounded-2xl border border-white/10 bg-white/[0.04]"
+            className="min-h-[10.5rem] animate-pulse rounded-2xl border border-white/8 bg-white/[0.04]"
           />
         ))}
       </div>
@@ -103,7 +102,7 @@ export default function TaskMarketplace() {
 
   if (tasksQuery.isError) {
     return (
-      <p className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4 text-sm text-rose-100">
+      <p className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-3 text-sm text-rose-100">
         {tasksQuery.error instanceof Error
           ? tasksQuery.error.message
           : "Unable to load tasks"}
@@ -113,53 +112,45 @@ export default function TaskMarketplace() {
 
   if (tasks.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-10 text-center">
-        <p className="text-lg font-bold text-white">🎯 No active tasks yet</p>
-        <p className="mt-2 text-sm text-white/55">
-          Create an off-chain draft to get started. No funds are accepted yet.
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5 text-center">
+        <p className="text-2xl" aria-hidden>
+          🎯
+        </p>
+        <p className="mt-1.5 text-base font-bold text-white">
+          No live tasks yet
+        </p>
+        <p className="mt-1 text-[0.8rem] text-white/55">
+          Be the first to launch a campaign.
         </p>
         <Link
           href="/tasks/create"
-          className="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-cyan-500 px-5 text-[0.72rem] font-semibold uppercase tracking-wide text-white"
+          className="mt-3 inline-flex min-h-10 items-center justify-center rounded-xl bg-gradient-to-r from-base-blue via-[#3b6cff] to-indigo-600 px-5 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-white shadow-[0_8px_20px_rgba(0,82,255,0.35)]"
         >
-          Create Task
+          ✨ CREATE TASK
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
-        <Link
-          href="/tasks/create"
-          className="inline-flex min-h-9 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/15 px-3 text-[0.7rem] font-semibold uppercase tracking-wide text-cyan-100"
-        >
-          Create Task
-        </Link>
-      </div>
+    <div className="flex flex-col gap-2.5">
       <TaskFilters active={section} onChange={setSection} />
       {joinHint ? (
         <p className="text-[0.7rem] text-cyan-100/80" role="status">
           {joinHint}
         </p>
       ) : null}
-      <section>
-        <h2 className="mb-2.5 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-white/45">
-          {MARKETPLACE_SECTION_LABELS[section]}
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {visible.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onJoin={onJoin}
-              joining={joiningId === task.id}
-              joined={joinedIds.includes(task.id)}
-            />
-          ))}
-        </div>
-      </section>
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {visible.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            onJoin={onJoin}
+            joining={joiningId === task.id}
+            joined={joinedIds.includes(task.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
