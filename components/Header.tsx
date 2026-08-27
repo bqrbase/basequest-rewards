@@ -18,7 +18,7 @@ type NavItem = {
 const MAIN_NAV: readonly NavItem[] = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
-  { href: "/tasks", label: "Tasks" },
+  { href: "/tasks/me", label: "Tasks" },
   { href: "/achievements", label: "Achievements" },
   { href: "/referral", label: "Referral" },
   { href: "/rewards", label: "Rewards" },
@@ -55,6 +55,9 @@ function formatHeaderWalletAddress(address: string) {
 function isActiveRoute(pathname: string, href: string) {
   if (href === "/") {
     return pathname === "/";
+  }
+  if (href === "/tasks/me") {
+    return pathname === "/tasks" || pathname.startsWith("/tasks/");
   }
 
   return pathname.startsWith(href);
