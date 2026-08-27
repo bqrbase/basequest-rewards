@@ -39,8 +39,12 @@ export const MAX_PARTICIPANTS_CAP = 1_000_000;
 /** Server-wide Phase 1 Share Cast catalog amount. Never taken from the browser. */
 export const SHARE_CAST_REWARD_BQR = 25;
 export const SHARE_CAST_REWARD_TYPE = "share_cast" as const;
+/** Standalone BQR Share Rewards (no Task2Earn task). Distinct from task share_cast. */
+export const SHARE_REWARDS_REWARD_TYPE = "bqr_share_daily" as const;
 export const SHARE_CAST_REWARD_SOURCE = "farcaster_share" as const;
 export const SHARE_CAST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Configured off-chain standalone pool. Must stay in sync with the SQL trigger cap. */
+export const BQR_SHARE_REWARDS_POOL_BQR = 10_000;
 export const T2E_EARNED_BQR_LABEL = "Task2Earn earned BQR (off-chain)";
 
 export function isFollowerMinimum(

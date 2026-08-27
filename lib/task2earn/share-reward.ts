@@ -9,6 +9,7 @@ import { logSupabaseError } from "@/lib/supabase/errors";
 import {
   SHARE_CAST_REWARD_SOURCE,
   SHARE_CAST_REWARD_TYPE,
+  SHARE_REWARDS_REWARD_TYPE,
   T2E_EARNED_BQR_LABEL,
 } from "@/lib/task2earn/constants";
 import {
@@ -19,16 +20,19 @@ import {
 import { getMarketplaceTask } from "@/lib/task2earn/server";
 import {
   catalogShareCastAmountBqr,
+  classifyStandaloneLedgerInsertError,
   evaluateShareCastEligibility,
   existingCreditedShare,
   mapLedgerEntry,
   parseShareRewardRequest,
   shareCastClaimId,
   sumCreditedBqr,
+  buildStandaloneLedgerInsert,
 } from "@/lib/task2earn/share-reward-logic";
 import {
   buildShareRewardsCampaign,
   latestCreditedAt,
+  nextShareRewardEligibleAt,
   type ShareRewardsCampaign,
 } from "@/lib/task2earn/share-rewards-display";
 import {
@@ -51,8 +55,10 @@ export {
   existingCreditedShare,
   parseShareRewardRequest,
   shareCastClaimId,
+  shareRewardsClaimId,
   SHARE_CAST_ELIGIBLE_STATUSES,
   sumCreditedBqr,
+  buildStandaloneLedgerInsert,
 } from "@/lib/task2earn/share-reward-logic";
 
 function requireAdmin() {
@@ -296,6 +302,86 @@ async function insertLedgerRow(params: {
   return { row: data as T2eRewardLedgerRow, duplicate: false };
 }
 
+async function lookupStandaloneLedgerRow(params: {
+  claimId: string;
+  castHash: string;
+}): Promise<T2eRewardLedgerRow | null> {
+  const supabase = requireAdmin();
+  const { data: byClaim, error: claimError } = await supabase
+    .from(T2E_TABLES.rewardLedger)
+    .select("*")
+    .eq("claim_id", params.claimId)
+    .maybeSingle();
+  if (claimError) {
+    throw claimError;
+  }
+  if (byClaim) {
+    return byClaim as T2eRewardLedgerRow;
+  }
+  const { data: byHash, error: hashError } = await supabase
+    .from(T2E_TABLES.rewardLedger)
+    .select("*")
+    .eq("cast_hash", params.castHash)
+    .maybeSingle();
+  if (hashError) {
+    throw hashError;
+  }
+  return (byHash as T2eRewardLedgerRow | null) ?? null;
+}
+
+async function insertStandaloneLedgerRow(params: {
+  walletAddress: string;
+  fid: number;
+  castHash: string;
+}): Promise<{ row: T2eRewardLedgerRow; duplicate: boolean }> {
+  const supabase = requireAdmin();
+  const now = new Date().toISOString();
+  const payload = buildStandaloneLedgerInsert({
+    fid: params.fid,
+    walletAddress: params.walletAddress,
+    castHash: params.castHash,
+    creditedAtIso: now,
+  });
+  const { data, error } = await supabase
+    .from(T2E_TABLES.rewardLedger)
+    .insert({
+      claim_id: payload.claim_id,
+      wallet_address: payload.wallet_address,
+      fid: payload.fid,
+      reward_type: payload.reward_type,
+      source: payload.source,
+      reference_id: payload.reference_id,
+      amount_bqr: payload.amount_bqr,
+      status: payload.status,
+      cast_hash: payload.cast_hash,
+      share_id: payload.share_id,
+      credited_at: payload.credited_at,
+      claimed_at: payload.claimed_at,
+      tx_hash: payload.tx_hash,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const conflict = classifyStandaloneLedgerInsertError(error);
+    if (conflict === "duplicate") {
+      const existing = await lookupStandaloneLedgerRow({
+        claimId: payload.claim_id,
+        castHash: payload.cast_hash,
+      });
+      if (existing) {
+        return { row: existing, duplicate: true };
+      }
+    }
+    logSupabaseError("insertStandaloneLedgerRow", "insert ledger", error, {
+      claimId: payload.claim_id,
+    });
+    throw error;
+  }
+
+  return { row: data as T2eRewardLedgerRow, duplicate: false };
+}
+
 async function attachShareToLedger(ledgerId: string, shareId: string) {
   const supabase = requireAdmin();
   const { error } = await supabase
@@ -465,28 +551,83 @@ function isMissingLedgerError(error: unknown): boolean {
   );
 }
 
-async function sumAllCreditedShareCastBqr(): Promise<number> {
+async function sumAllStandaloneCreditedBqr(): Promise<number> {
   const supabase = requireAdmin();
   const { data, error } = await supabase
     .from(T2E_TABLES.rewardLedger)
-    .select("amount_bqr, status")
-    .eq("reward_type", SHARE_CAST_REWARD_TYPE)
+    .select("amount_bqr, status, reward_type")
+    .eq("reward_type", SHARE_REWARDS_REWARD_TYPE)
     .eq("status", "credited");
   if (error) {
     if (isMissingLedgerError(error)) {
       return 0;
     }
-    logSupabaseError("sumAllCreditedShareCastBqr", "select ledger", error);
+    logSupabaseError("sumAllStandaloneCreditedBqr", "select ledger", error);
     throw error;
   }
   return sumCreditedBqr(data ?? []);
+}
+
+async function loadStandaloneLedgerForWallet(
+  walletAddress: string,
+): Promise<T2eRewardLedgerRow[]> {
+  const supabase = requireAdmin();
+  const { data, error } = await supabase
+    .from(T2E_TABLES.rewardLedger)
+    .select("*")
+    .eq("wallet_address", walletAddress)
+    .eq("reward_type", SHARE_REWARDS_REWARD_TYPE)
+    .order("created_at", { ascending: false });
+  if (error) {
+    if (isMissingLedgerError(error)) {
+      return [];
+    }
+    logSupabaseError("loadStandaloneLedgerForWallet", "select ledger", error, {
+      walletAddress,
+    });
+    throw error;
+  }
+  return (data ?? []) as T2eRewardLedgerRow[];
+}
+
+async function loadLatestStandaloneCreditedAtForFid(
+  fid: number,
+): Promise<string | null> {
+  const supabase = requireAdmin();
+  const { data, error } = await supabase
+    .from(T2E_TABLES.rewardLedger)
+    .select("credited_at")
+    .eq("fid", fid)
+    .eq("reward_type", SHARE_REWARDS_REWARD_TYPE)
+    .eq("status", "credited")
+    .not("credited_at", "is", null)
+    .order("credited_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isMissingLedgerError(error)) {
+      return null;
+    }
+    logSupabaseError(
+      "loadLatestStandaloneCreditedAtForFid",
+      "select ledger",
+      error,
+      { fid },
+    );
+    throw error;
+  }
+  const creditedAt =
+    data && typeof data === "object" && "credited_at" in data
+      ? data.credited_at
+      : null;
+  return typeof creditedAt === "string" ? creditedAt : null;
 }
 
 export async function getShareRewardsCampaign(
   walletAddress?: string | null,
 ): Promise<ShareRewardsCampaign> {
   try {
-    const creditedPoolBqr = await sumAllCreditedShareCastBqr();
+    const creditedPoolBqr = await sumAllStandaloneCreditedBqr();
     if (!walletAddress) {
       return buildShareRewardsCampaign({
         creditedPoolBqr,
@@ -494,7 +635,7 @@ export async function getShareRewardsCampaign(
         lastCreditedAt: null,
       });
     }
-    const rows = await loadLedgerForWallet(walletAddress);
+    const rows = await loadStandaloneLedgerForWallet(walletAddress);
     const credited = rows.filter((row) => row.status === "credited");
     return buildShareRewardsCampaign({
       creditedPoolBqr,
@@ -552,6 +693,18 @@ export async function verifyDailyShareReward(params: {
     return { ok: false, error: "farcaster_required", status: 400 };
   }
 
+  const latestFidCredit = await loadLatestStandaloneCreditedAtForFid(fid);
+  if (nextShareRewardEligibleAt(latestFidCredit)) {
+    const campaign = await getShareRewardsCampaign(parsed.wallet);
+    return {
+      ok: true,
+      alreadyClaimed: true,
+      verified: true,
+      campaign,
+      castHash: null,
+    };
+  }
+
   const campaign = await getShareRewardsCampaign(parsed.wallet);
   if (campaign.claimedToday) {
     return {
@@ -587,11 +740,40 @@ export async function verifyDailyShareReward(params: {
     };
   }
 
-  return {
-    ok: true,
-    alreadyClaimed: false,
-    verified: true,
-    campaign,
-    castHash: proof.cast.hash,
-  };
+  try {
+    const inserted = await insertStandaloneLedgerRow({
+      walletAddress: parsed.wallet,
+      fid,
+      castHash: proof.cast.hash,
+    });
+    const fresh = await getShareRewardsCampaign(parsed.wallet);
+    return {
+      ok: true,
+      alreadyClaimed: inserted.duplicate,
+      verified: true,
+      campaign: fresh,
+      castHash: inserted.row.cast_hash ?? proof.cast.hash,
+    };
+  } catch (error) {
+    const conflict = classifyStandaloneLedgerInsertError(error);
+    const fresh = await getShareRewardsCampaign(parsed.wallet);
+    if (conflict === "duplicate" || conflict === "cooldown") {
+      return {
+        ok: true,
+        alreadyClaimed: true,
+        verified: true,
+        campaign: fresh,
+        castHash: proof.cast.hash,
+      };
+    }
+    if (conflict === "pool_depleted") {
+      return {
+        ok: false,
+        error: "pool_depleted",
+        status: 409,
+        campaign: fresh,
+      };
+    }
+    throw error;
+  }
 }

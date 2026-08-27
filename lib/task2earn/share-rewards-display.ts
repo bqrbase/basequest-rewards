@@ -1,7 +1,11 @@
-import { SHARE_CAST_MAX_AGE_MS, SHARE_CAST_REWARD_BQR } from "./constants";
+import {
+  BQR_SHARE_REWARDS_POOL_BQR,
+  SHARE_CAST_MAX_AGE_MS,
+  SHARE_CAST_REWARD_BQR,
+} from "./constants";
 
 /** Configured off-chain BQR Share Rewards pool. Not an on-chain balance. */
-export const BQR_SHARE_REWARDS_POOL_BQR = 10_000;
+export { BQR_SHARE_REWARDS_POOL_BQR };
 
 export type ShareRewardsCampaign = {
   poolConfiguredBqr: number;

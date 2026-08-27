@@ -106,7 +106,7 @@ export type T2eShareRow = {
 
 export type T2eRewardLedgerStatus = "pending" | "credited" | "claimed" | "void";
 
-export type T2eRewardType = "share_cast";
+export type T2eRewardType = "share_cast" | "bqr_share_daily";
 
 export type T2eRewardSource = "farcaster_share";
 
@@ -117,7 +117,7 @@ export type T2eRewardLedgerRow = {
   fid: number;
   reward_type: T2eRewardType;
   source: T2eRewardSource;
-  reference_id: string;
+  reference_id: string | null;
   amount_bqr: string | number;
   status: T2eRewardLedgerStatus;
   cast_hash: string | null;
