@@ -102,6 +102,7 @@ export async function POST(request: Request) {
       verified: result.verified,
       campaign: result.campaign,
       castHash: result.castHash,
+      qualifiedOnchain: result.qualifiedOnchain,
       label: T2E_EARNED_BQR_LABEL,
     });
   } catch (error) {

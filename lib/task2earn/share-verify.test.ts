@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { canonicalTaskUrl, MINI_APP_ORIGIN } from "../miniapp/share.ts";
+import {
+  canonicalAppUrl,
+  canonicalShareRewardsImageUrl,
+  canonicalShareRewardsUrl,
+  canonicalTaskUrl,
+  MINI_APP_ORIGIN,
+} from "../miniapp/share.ts";
 import {
   evaluateShareCastProof,
   extractShareCasts,
@@ -176,5 +182,79 @@ describe("extractShareCasts", () => {
     const casts = extractShareCasts({ casts: [rawCast()] });
     assert.equal(casts.length, 1);
     assert.equal(evaluateShareCastProof(casts[0] ?? null, rules), "valid");
+  });
+});
+
+describe("standalone Share Rewards proof URL", () => {
+  const shareRules: ShareCastProofRules = {
+    expectedFid: FID,
+    taskUrl: canonicalShareRewardsUrl(),
+    taskCreatedAtMs: 0,
+    nowMs: NOW,
+  };
+
+  it("accepts an original cast that embeds /tasks/me", () => {
+    assert.equal(canonicalShareRewardsUrl(), "https://basequest.online/tasks/me");
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({ embedUrls: [canonicalShareRewardsUrl()] }),
+        shareRules,
+      ),
+      "valid",
+    );
+  });
+
+  it("still rejects homepage, listing, PNG, replies, recasts, and stale casts", () => {
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({ embedUrls: [canonicalAppUrl()] }),
+        shareRules,
+      ),
+      "wrong_task_url",
+    );
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({ embedUrls: [`${MINI_APP_ORIGIN}/tasks`] }),
+        shareRules,
+      ),
+      "listing_url",
+    );
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({ embedUrls: [canonicalShareRewardsImageUrl()] }),
+        shareRules,
+      ),
+      "wrong_task_url",
+    );
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({
+          embedUrls: [canonicalShareRewardsUrl()],
+          parentHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        }),
+        shareRules,
+      ),
+      "reply",
+    );
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({
+          embedUrls: [canonicalShareRewardsUrl()],
+          isRecast: true,
+        }),
+        shareRules,
+      ),
+      "recast_or_quote",
+    );
+    assert.equal(
+      evaluateShareCastProof(
+        parsed({
+          embedUrls: [canonicalShareRewardsUrl()],
+          timestampMs: NOW - 25 * 60 * 60 * 1000,
+        }),
+        shareRules,
+      ),
+      "stale_cast",
+    );
   });
 });

@@ -70,7 +70,7 @@ export function buildStandaloneLedgerInsert(params: {
   source: typeof SHARE_CAST_REWARD_SOURCE;
   reference_id: null;
   amount_bqr: number;
-  status: "credited";
+  status: "pending";
   cast_hash: string;
   share_id: null;
   credited_at: string;
@@ -86,7 +86,7 @@ export function buildStandaloneLedgerInsert(params: {
     source: SHARE_CAST_REWARD_SOURCE,
     reference_id: null,
     amount_bqr: catalogShareCastAmountBqr(),
-    status: "credited",
+    status: "pending",
     cast_hash: castHash,
     share_id: null,
     credited_at: params.creditedAtIso,
@@ -105,8 +105,7 @@ export function decideStandaloneShareCredit(
   },
 ):
   | { ok: true; alreadyClaimed: false; row: ReturnType<typeof buildStandaloneLedgerInsert> }
-  | { ok: true; alreadyClaimed: true }
-  | { ok: false; error: "pool_depleted" } {
+  | { ok: true; alreadyClaimed: true } {
   const row = buildStandaloneLedgerInsert(attempt);
   const claimTaken = existing.some((entry) => entry.claim_id === row.claim_id);
   const hashTaken = existing.some(
@@ -124,9 +123,6 @@ export function decideStandaloneShareCredit(
   if (claimTaken || hashTaken || overlapping) {
     return { ok: true, alreadyClaimed: true };
   }
-  if (wouldExceedStandalonePool(sumStandaloneCreditedBqr(existing), row.amount_bqr)) {
-    return { ok: false, error: "pool_depleted" };
-  }
   return { ok: true, alreadyClaimed: false, row };
 }
 
@@ -135,7 +131,8 @@ export function isStandaloneShareRewardRow(row: {
   status?: string;
 }): boolean {
   return (
-    row.reward_type === SHARE_REWARDS_REWARD_TYPE && row.status === "credited"
+    row.reward_type === SHARE_REWARDS_REWARD_TYPE &&
+    (row.status === "pending" || row.status === "credited")
   );
 }
 
@@ -146,7 +143,12 @@ export function sumStandaloneCreditedBqr(
     reward_type?: string;
   }>,
 ): number {
-  return sumCreditedBqr(rows.filter(isStandaloneShareRewardRow));
+  return sumCreditedBqr(
+    rows.filter(
+      (row) =>
+        row.reward_type === SHARE_REWARDS_REWARD_TYPE && row.status === "credited",
+    ),
+  );
 }
 
 export function wouldExceedStandalonePool(

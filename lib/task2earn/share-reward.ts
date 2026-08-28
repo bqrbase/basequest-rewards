@@ -3,7 +3,7 @@ import {
   fetchUserCastsPage,
   lookupFidByWalletAddress,
 } from "@/lib/farcaster/neynar";
-import { canonicalAppUrl, canonicalTaskUrl } from "@/lib/miniapp/share";
+import { canonicalShareRewardsUrl, canonicalTaskUrl } from "@/lib/miniapp/share";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { logSupabaseError } from "@/lib/supabase/errors";
 import {
@@ -30,11 +30,17 @@ import {
   buildStandaloneLedgerInsert,
 } from "@/lib/task2earn/share-reward-logic";
 import {
+  applyOnChainShareRewardCooldown,
   buildShareRewardsCampaign,
-  latestCreditedAt,
+  latestPaidAt,
   nextShareRewardEligibleAt,
   type ShareRewardsCampaign,
 } from "@/lib/task2earn/share-rewards-display";
+import {
+  applySharePoolAuthorizationToCampaign,
+  authorizeVerifiedShare,
+  shouldAuthorizeVerifiedShare,
+} from "@/lib/task2earn/share-pool-authorize";
 import {
   evaluateShareCastProof,
   extractFeedCursor,
@@ -48,6 +54,12 @@ import {
 } from "@/lib/task2earn/share-verify";
 import type { Task2EarnEarnedRewards } from "@/lib/task2earn/types";
 import { normalizeWalletAddress } from "@/lib/x/config";
+import { BQR_SHARE_REWARDS_POOL_ABI } from "@/lib/contracts/abi/BqrShareRewardsPool";
+import { getBqrShareRewardsPoolAddress, resolveShareRewardsClaimPoolAddress } from "@/lib/contracts/shareRewardsPool";
+import { getBasePublicClient } from "@/lib/rewards/server/baseClient";
+import {
+  isStandalonePendingRow,
+} from "@/lib/task2earn/share-pool-flow";
 
 export {
   catalogShareCastAmountBqr,
@@ -590,18 +602,17 @@ async function loadStandaloneLedgerForWallet(
   return (data ?? []) as T2eRewardLedgerRow[];
 }
 
-async function loadLatestStandaloneCreditedAtForFid(
+async function loadLatestStandaloneActivityAtForFid(
   fid: number,
 ): Promise<string | null> {
   const supabase = requireAdmin();
   const { data, error } = await supabase
     .from(T2E_TABLES.rewardLedger)
-    .select("credited_at")
+    .select("credited_at, claimed_at, status")
     .eq("fid", fid)
     .eq("reward_type", SHARE_REWARDS_REWARD_TYPE)
-    .eq("status", "credited")
-    .not("credited_at", "is", null)
-    .order("credited_at", { ascending: false })
+    .in("status", ["pending", "credited"])
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) {
@@ -609,18 +620,111 @@ async function loadLatestStandaloneCreditedAtForFid(
       return null;
     }
     logSupabaseError(
-      "loadLatestStandaloneCreditedAtForFid",
+      "loadLatestStandaloneActivityAtForFid",
       "select ledger",
       error,
       { fid },
     );
     throw error;
   }
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  const claimedAt =
+    "claimed_at" in data && typeof data.claimed_at === "string"
+      ? data.claimed_at
+      : null;
   const creditedAt =
-    data && typeof data === "object" && "credited_at" in data
+    "credited_at" in data && typeof data.credited_at === "string"
       ? data.credited_at
       : null;
-  return typeof creditedAt === "string" ? creditedAt : null;
+  return claimedAt || creditedAt;
+}
+
+function attachClaimPoolAddress(
+  campaign: ShareRewardsCampaign,
+): ShareRewardsCampaign {
+  return {
+    ...campaign,
+    claimPoolAddress: resolveShareRewardsClaimPoolAddress(),
+  };
+}
+
+async function readSharePoolRemainingBqr(): Promise<number | null> {
+  try {
+    const pool = getBqrShareRewardsPoolAddress();
+    if (!pool) {
+      return null;
+    }
+    const client = getBasePublicClient();
+    const balance = await client.readContract({
+      abi: BQR_SHARE_REWARDS_POOL_ABI,
+      address: pool,
+      functionName: "tokenBalance",
+    });
+    return Number(balance) / 1e18;
+  } catch (error) {
+    console.error("[task2earn] share pool tokenBalance read failed", error);
+    return null;
+  }
+}
+
+async function readSharePoolFidNextEligibleAt(
+  fid: number,
+): Promise<string | null> {
+  try {
+    const pool = getBqrShareRewardsPoolAddress();
+    if (!pool || !Number.isInteger(fid) || fid <= 0) {
+      return null;
+    }
+    const client = getBasePublicClient();
+    const next = await client.readContract({
+      abi: BQR_SHARE_REWARDS_POOL_ABI,
+      address: pool,
+      functionName: "nextEligibleAt",
+      args: [BigInt(fid)],
+    });
+    if (typeof next !== "bigint" || next === 0n) {
+      return null;
+    }
+    return new Date(Number(next) * 1000).toISOString();
+  } catch (error) {
+    console.error("[task2earn] share pool nextEligibleAt read failed", error);
+    return null;
+  }
+}
+
+function fidFromStandaloneRows(rows: T2eRewardLedgerRow[]): number | null {
+  for (const row of rows) {
+    if (
+      row.reward_type === SHARE_REWARDS_REWARD_TYPE &&
+      typeof row.fid === "number" &&
+      Number.isInteger(row.fid) &&
+      row.fid > 0
+    ) {
+      return row.fid;
+    }
+  }
+  return null;
+}
+
+function campaignFromRows(
+  rows: T2eRewardLedgerRow[],
+  creditedPoolBqr: number,
+  poolRemainingBqr: number | null,
+): ShareRewardsCampaign {
+  const credited = rows.filter((row) => row.status === "credited");
+  const pending = rows.find((row) => isStandalonePendingRow(row)) ?? null;
+  return buildShareRewardsCampaign({
+    creditedPoolBqr,
+    earnedBqr: sumCreditedBqr(credited),
+    lastCreditedAt: latestPaidAt(rows),
+    poolRemainingBqr: poolRemainingBqr ?? undefined,
+    claimable: Boolean(pending),
+    claimFid: pending?.fid ?? null,
+    claimCastHash: pending?.cast_hash ?? null,
+    qualifiedWallet: pending?.wallet_address ?? null,
+  });
 }
 
 export async function getShareRewardsCampaign(
@@ -628,27 +732,39 @@ export async function getShareRewardsCampaign(
 ): Promise<ShareRewardsCampaign> {
   try {
     const creditedPoolBqr = await sumAllStandaloneCreditedBqr();
+    const onChainRemaining = await readSharePoolRemainingBqr();
     if (!walletAddress) {
-      return buildShareRewardsCampaign({
-        creditedPoolBqr,
-        earnedBqr: 0,
-        lastCreditedAt: null,
-      });
+      return attachClaimPoolAddress(
+        buildShareRewardsCampaign({
+          creditedPoolBqr,
+          earnedBqr: 0,
+          lastCreditedAt: null,
+          poolRemainingBqr: onChainRemaining ?? undefined,
+        }),
+      );
     }
     const rows = await loadStandaloneLedgerForWallet(walletAddress);
-    const credited = rows.filter((row) => row.status === "credited");
-    return buildShareRewardsCampaign({
+    const campaign = campaignFromRows(
+      rows,
       creditedPoolBqr,
-      earnedBqr: sumCreditedBqr(credited),
-      lastCreditedAt: latestCreditedAt(rows),
-    });
+      onChainRemaining,
+    );
+    const fid = campaign.claimFid ?? fidFromStandaloneRows(rows);
+    const onChainNextEligibleAt = fid
+      ? await readSharePoolFidNextEligibleAt(fid)
+      : null;
+    return attachClaimPoolAddress(
+      applyOnChainShareRewardCooldown(campaign, onChainNextEligibleAt),
+    );
   } catch (error) {
     if (isMissingLedgerError(error)) {
-      return buildShareRewardsCampaign({
-        creditedPoolBqr: 0,
-        earnedBqr: 0,
-        lastCreditedAt: null,
-      });
+      return attachClaimPoolAddress(
+        buildShareRewardsCampaign({
+          creditedPoolBqr: 0,
+          earnedBqr: 0,
+          lastCreditedAt: null,
+        }),
+      );
     }
     throw error;
   }
@@ -661,6 +777,7 @@ export type VerifyDailyShareResult =
       verified: boolean;
       campaign: ShareRewardsCampaign;
       castHash: string | null;
+      qualifiedOnchain: boolean;
     }
   | {
       ok: false;
@@ -670,10 +787,17 @@ export type VerifyDailyShareResult =
       campaign?: ShareRewardsCampaign;
     };
 
-export async function verifyDailyShareReward(params: {
-  walletAddress: string;
-  castHashHint?: string | null;
-}): Promise<VerifyDailyShareResult> {
+export type VerifyDailyShareDeps = {
+  authorizeVerifiedShare?: typeof authorizeVerifiedShare;
+};
+
+export async function verifyDailyShareReward(
+  params: {
+    walletAddress: string;
+    castHashHint?: string | null;
+  },
+  deps?: VerifyDailyShareDeps,
+): Promise<VerifyDailyShareResult> {
   const parsed = parseShareRewardRequest({
     wallet: params.walletAddress,
     castHash: params.castHashHint,
@@ -693,26 +817,48 @@ export async function verifyDailyShareReward(params: {
     return { ok: false, error: "farcaster_required", status: 400 };
   }
 
-  const latestFidCredit = await loadLatestStandaloneCreditedAtForFid(fid);
-  if (nextShareRewardEligibleAt(latestFidCredit)) {
-    const campaign = await getShareRewardsCampaign(parsed.wallet);
+  const authorizeShare = deps?.authorizeVerifiedShare ?? authorizeVerifiedShare;
+  const latestActivity = await loadLatestStandaloneActivityAtForFid(fid);
+  const campaign = await getShareRewardsCampaign(parsed.wallet);
+  if (campaign.claimable) {
+    const decision = shouldAuthorizeVerifiedShare({
+      proofOk: true,
+      alreadyClaimable: true,
+      claimedToday: false,
+      cooldownActive: false,
+      poolLive: campaign.live,
+      ledgerInserted: true,
+      ledgerDuplicate: true,
+    });
+    let qualifiedOnchain = false;
+    let nextCampaign = campaign;
+    if (decision.authorize && campaign.claimCastHash) {
+      const auth = await authorizeShare({
+        account: parsed.wallet,
+        fid,
+        castHash: campaign.claimCastHash,
+      });
+      const applied = applySharePoolAuthorizationToCampaign(campaign, auth);
+      nextCampaign = applied.campaign;
+      qualifiedOnchain = applied.qualifiedOnchain;
+    }
     return {
       ok: true,
       alreadyClaimed: true,
       verified: true,
-      campaign,
-      castHash: null,
+      campaign: nextCampaign,
+      castHash: nextCampaign.claimCastHash ?? campaign.claimCastHash,
+      qualifiedOnchain,
     };
   }
-
-  const campaign = await getShareRewardsCampaign(parsed.wallet);
-  if (campaign.claimedToday) {
+  if (nextShareRewardEligibleAt(latestActivity) || campaign.claimedToday) {
     return {
       ok: true,
       alreadyClaimed: true,
       verified: true,
       campaign,
       castHash: null,
+      qualifiedOnchain: false,
     };
   }
   if (!campaign.live) {
@@ -726,7 +872,7 @@ export async function verifyDailyShareReward(params: {
 
   const proof = await proveShareCast({
     fid,
-    expectedUrl: canonicalAppUrl(),
+    expectedUrl: canonicalShareRewardsUrl(),
     notBeforeMs: 0,
     hashHint: parsed.castHashHint,
   });
@@ -746,17 +892,75 @@ export async function verifyDailyShareReward(params: {
       fid,
       castHash: proof.cast.hash,
     });
+    const castHash = inserted.row.cast_hash ?? proof.cast.hash;
+    const decision = shouldAuthorizeVerifiedShare({
+      proofOk: true,
+      alreadyClaimable: false,
+      claimedToday: false,
+      cooldownActive: false,
+      poolLive: true,
+      ledgerInserted: true,
+      ledgerDuplicate: inserted.duplicate,
+    });
     const fresh = await getShareRewardsCampaign(parsed.wallet);
+    if (!decision.authorize) {
+      return {
+        ok: true,
+        alreadyClaimed: inserted.duplicate,
+        verified: true,
+        campaign: fresh,
+        castHash,
+        qualifiedOnchain: false,
+      };
+    }
+    const auth = await authorizeShare({
+      account: parsed.wallet,
+      fid,
+      castHash,
+    });
+    const applied = applySharePoolAuthorizationToCampaign(fresh, auth);
     return {
       ok: true,
       alreadyClaimed: inserted.duplicate,
       verified: true,
-      campaign: fresh,
-      castHash: inserted.row.cast_hash ?? proof.cast.hash,
+      campaign: applied.campaign,
+      castHash,
+      qualifiedOnchain: applied.qualifiedOnchain,
     };
   } catch (error) {
     const conflict = classifyStandaloneLedgerInsertError(error);
     const fresh = await getShareRewardsCampaign(parsed.wallet);
+    const decision = shouldAuthorizeVerifiedShare({
+      proofOk: true,
+      alreadyClaimable: false,
+      claimedToday: false,
+      cooldownActive: conflict === "cooldown",
+      poolLive: conflict !== "pool_depleted",
+      ledgerInserted: false,
+      ledgerDuplicate: conflict === "duplicate",
+      ledgerConflict:
+        conflict === "duplicate" ||
+        conflict === "cooldown" ||
+        conflict === "pool_depleted"
+          ? conflict
+          : "failed",
+    });
+    if (conflict === "duplicate" && decision.authorize) {
+      const auth = await authorizeShare({
+        account: parsed.wallet,
+        fid,
+        castHash: proof.cast.hash,
+      });
+      const applied = applySharePoolAuthorizationToCampaign(fresh, auth);
+      return {
+        ok: true,
+        alreadyClaimed: true,
+        verified: true,
+        campaign: applied.campaign,
+        castHash: proof.cast.hash,
+        qualifiedOnchain: applied.qualifiedOnchain,
+      };
+    }
     if (conflict === "duplicate" || conflict === "cooldown") {
       return {
         ok: true,
@@ -764,6 +968,7 @@ export async function verifyDailyShareReward(params: {
         verified: true,
         campaign: fresh,
         castHash: proof.cast.hash,
+        qualifiedOnchain: false,
       };
     }
     if (conflict === "pool_depleted") {

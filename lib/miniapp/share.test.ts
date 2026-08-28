@@ -10,6 +10,7 @@ import {
   canonicalScoreShareImageUrl,
   canonicalScoreUrl,
   canonicalShareRewardsImageUrl,
+  canonicalShareRewardsUrl,
   canonicalTaskShareImageUrl,
   canonicalTaskUrl,
   farcasterComposeUrl,
@@ -93,16 +94,18 @@ describe("share copy", () => {
     assert.equal(text.includes("/tasks/"), false);
   });
 
-  it("attaches the promotional image and canonical Mini App URL, not a task URL", () => {
+  it("embeds only the Share Rewards page URL, not a PNG or the homepage", () => {
+    const url = canonicalShareRewardsUrl();
     const image = canonicalShareRewardsImageUrl();
-    const appUrl = canonicalAppUrl();
+    assert.equal(url, "https://basequest.online/tasks/me");
+    assert.notEqual(url, canonicalAppUrl());
     assert.equal(image, "https://basequest.online/images/bqr-share-rewards.png");
-    assert.equal(appUrl, "https://basequest.online");
-    assert.equal(image.includes("/tasks/"), false);
     assert.notEqual(image, canonicalTaskShareImageUrl(TASK_ID));
-    const compose = farcasterComposeUrl(shareRewardsCastText(), appUrl, image);
-    assert.equal(compose.includes(encodeURIComponent(appUrl)), true);
-    assert.equal(compose.includes(encodeURIComponent(image)), true);
+    const compose = farcasterComposeUrl(shareRewardsCastText(), url);
+    const embeds = new URL(compose).searchParams.getAll("embeds[]");
+    assert.deepEqual(embeds, ["https://basequest.online/tasks/me"]);
+    assert.equal(embeds.length, 1);
+    assert.equal(compose.includes(encodeURIComponent(image)), false);
     assert.equal(compose.includes(encodeURIComponent(`/tasks/${TASK_ID}`)), false);
   });
 
@@ -138,6 +141,26 @@ describe("Mini App embed metadata", () => {
     assert.equal(embed.button.action.url, url);
     assert.equal(embed.imageUrl, imageUrl);
     assert.notEqual(embed.imageUrl, MINI_APP_EMBED_IMAGE);
+  });
+
+  it("emits launch_miniapp pointing at Share Rewards with the campaign image", () => {
+    const url = canonicalShareRewardsUrl();
+    const tags = buildMiniAppEmbedTags({
+      url,
+      buttonTitle: "Open Share Rewards",
+      imageUrl: canonicalShareRewardsImageUrl(),
+    });
+    const miniapp = JSON.parse(tags["fc:miniapp"]) as {
+      imageUrl: string;
+      button: { action: { type: string; url: string } };
+    };
+    assert.equal(miniapp.button.action.type, "launch_miniapp");
+    assert.equal(miniapp.button.action.url, "https://basequest.online/tasks/me");
+    assert.equal(
+      miniapp.imageUrl,
+      "https://basequest.online/images/bqr-share-rewards.png",
+    );
+    assert.notEqual(miniapp.button.action.url, canonicalAppUrl());
   });
 
   it("emits launch_miniapp pointing at the score page with a distinct image", () => {

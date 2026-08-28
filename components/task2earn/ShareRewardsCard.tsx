@@ -1,25 +1,33 @@
 "use client";
 
 import {
+  confirmSharePoolClaimRequest,
   fetchShareRewardsCampaign,
   verifyDailyShareRewardRequest,
 } from "@/lib/task2earn/client";
-import { formatShareRewardCountdown, buildShareRewardsCampaign } from "@/lib/task2earn/share-rewards-display";
+import { claimBqrShareReward } from "@/lib/contracts/claim/bqrShareRewardsPool";
+import { walletsMatch } from "@/lib/task2earn/share-pool-flow";
+import {
+  formatShareRewardCountdown,
+  applyOnChainShareRewardCooldown,
+  buildShareRewardsCampaign,
+  campaignAfterSuccessfulClaim,
+} from "@/lib/task2earn/share-rewards-display";
 import type { ShareRewardsCampaign } from "@/lib/task2earn/share-rewards-display";
 import {
-  canonicalAppUrl,
-  canonicalShareRewardsImageUrl,
+  canonicalShareRewardsUrl,
   farcasterComposeUrl,
   shareRewardsCastText,
 } from "@/lib/miniapp/share";
+import { useWalletHost } from "@/lib/wallet/WalletHostContext";
 import { Gift, Share2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { getAddress } from "viem";
+import { useAccount, useChainId, useConfig } from "wagmi";
 
 async function openShareCastComposer(
   text: string,
   embedUrl: string,
-  imageUrl: string,
 ): Promise<{ openedInMiniApp: boolean; hash: string | null }> {
   try {
     const { sdk } = await import("@farcaster/miniapp-sdk");
@@ -28,7 +36,7 @@ async function openShareCastComposer(
       return { openedInMiniApp: false, hash: null };
     }
     if (typeof sdk.actions.composeCast === "function") {
-      const embeds: [string, string] = [embedUrl, imageUrl];
+      const embeds: [string] = [embedUrl];
       const result = (await sdk.actions.composeCast({
         text,
         embeds,
@@ -39,7 +47,7 @@ async function openShareCastComposer(
           : null;
       return { openedInMiniApp: true, hash };
     }
-    await sdk.actions.openUrl(farcasterComposeUrl(text, embedUrl, imageUrl));
+    await sdk.actions.openUrl(farcasterComposeUrl(text, embedUrl));
     return { openedInMiniApp: true, hash: null };
   } catch {
     return { openedInMiniApp: false, hash: null };
@@ -83,6 +91,10 @@ function formatBqr(value: number): string {
 
 export default function ShareRewardsCard() {
   const { address, status } = useAccount();
+  const config = useConfig();
+  const chainId = useChainId();
+  const walletHost = useWalletHost();
+  const farcasterWallet = walletHost === "farcaster";
   const wallet = status === "connected" && address ? address : null;
   const [campaign, setCampaign] = useState<ShareRewardsCampaign>(() =>
     buildShareRewardsCampaign({
@@ -123,13 +135,25 @@ export default function ShareRewardsCard() {
       try {
         const result = await verifyDailyShareRewardRequest(wallet, castHash);
         setCampaign(result.campaign);
+        if (result.campaign.claimable) {
+          setMessage(
+            "Share verified. Claim 25 BQR from your Farcaster wallet. You pay Base gas.",
+          );
+          return;
+        }
         if (result.alreadyClaimed) {
           setMessage("Already claimed today. Come back when the 24-hour window resets.");
           return;
         }
+        if (result.verified && !result.campaign.claimable) {
+          setMessage(
+            "Share verified, but on-chain authorization did not complete. Try Verify again in a moment.",
+          );
+          return;
+        }
         if (result.verified) {
           setMessage(
-            "Share verified. Daily BQR is credited off-chain from the shared pool.",
+            "Share verified. Claim 25 BQR from your Farcaster wallet. You pay Base gas.",
           );
         }
       } catch (error) {
@@ -151,15 +175,13 @@ export default function ShareRewardsCard() {
     }
     const composed = await openShareCastComposer(
       shareRewardsCastText(),
-      canonicalAppUrl(),
-      canonicalShareRewardsImageUrl(),
+      canonicalShareRewardsUrl(),
     );
     if (!composed.openedInMiniApp) {
       window.open(
         farcasterComposeUrl(
           shareRewardsCastText(),
-          canonicalAppUrl(),
-          canonicalShareRewardsImageUrl(),
+          canonicalShareRewardsUrl(),
         ),
         "_blank",
         "noopener,noreferrer",
@@ -178,9 +200,90 @@ export default function ShareRewardsCard() {
     );
   }, [verifyShare, wallet]);
 
+  const onClaim = useCallback(async () => {
+    if (!wallet) {
+      setMessage("Connect a wallet to claim 25 BQR.");
+      return;
+    }
+    if (!farcasterWallet) {
+      setMessage("Open this Mini App in Farcaster to claim. Claim uses the Farcaster wallet only.");
+      return;
+    }
+    if (campaign.claimedToday) {
+      setMessage("Already claimed. Come back when the 24-hour window resets.");
+      return;
+    }
+    if (
+      !campaign.claimable ||
+      !campaign.claimFid ||
+      !campaign.claimCastHash ||
+      !campaign.qualifiedWallet
+    ) {
+      setMessage("Verify a share before claiming.");
+      return;
+    }
+    if (!walletsMatch(wallet, campaign.qualifiedWallet)) {
+      setMessage("Connect the same wallet that verified this share.");
+      return;
+    }
+    setBusy(true);
+    setMessage("Confirm the claim in your Farcaster wallet. You pay Base gas.");
+    try {
+      const result = await claimBqrShareReward({
+        config,
+        chainId,
+        walletAddress: getAddress(wallet),
+        fid: campaign.claimFid,
+        castHash: campaign.claimCastHash,
+        qualifiedWallet: getAddress(campaign.qualifiedWallet),
+        ...(campaign.claimPoolAddress
+          ? { contractAddress: getAddress(campaign.claimPoolAddress) }
+          : {}),
+      });
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      setCampaign(campaignAfterSuccessfulClaim(campaign));
+      setMessage("Claimed 25 BQR. The payout went to your Farcaster wallet.");
+      try {
+        const confirmed = await confirmSharePoolClaimRequest(
+          wallet,
+          result.txHash,
+        );
+        setCampaign((current) =>
+          current.claimedToday && confirmed.campaign.claimable
+            ? applyOnChainShareRewardCooldown(
+                confirmed.campaign,
+                current.nextEligibleAt,
+              )
+            : confirmed.campaign,
+        );
+      } catch {
+        try {
+          const fresh = await fetchShareRewardsCampaign(wallet);
+          setCampaign((current) =>
+            current.claimedToday && fresh.claimable
+              ? applyOnChainShareRewardCooldown(fresh, current.nextEligibleAt)
+              : fresh,
+          );
+        } catch {
+          // Keep the local claimed state from the successful receipt.
+        }
+      }
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Claim failed. No BQR was marked paid.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [campaign, chainId, config, farcasterWallet, wallet]);
+
   const live = campaign.live;
   const claimed = campaign.claimedToday;
-  const ctaDisabled = busy || loading || !live || claimed;
+  const claimable = campaign.claimable && !claimed;
+  const ctaDisabled = busy || loading || !live || (claimed && !claimable);
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-amber-300/20 bg-[linear-gradient(180deg,rgba(28,22,12,0.94),rgba(10,12,28,0.96))] p-3.5 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
@@ -240,6 +343,10 @@ export default function ShareRewardsCard() {
               Next eligible in {formatShareRewardCountdown(campaign.nextEligibleAt)}
             </p>
           </div>
+        ) : claimable ? (
+          <p className="mt-1 font-sans text-lg font-bold text-amber-50">
+            Ready to claim {formatBqr(campaign.dailyRewardBqr)}
+          </p>
         ) : (
           <p className="mt-1 font-sans text-lg font-bold text-amber-50">
             {formatBqr(campaign.dailyRewardBqr)}
@@ -247,24 +354,39 @@ export default function ShareRewardsCard() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => void onShare()}
-        disabled={ctaDisabled && Boolean(wallet)}
-        className="relative mt-3 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-[0.78rem] font-bold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.4)] disabled:opacity-50"
-      >
-        <Share2 className="size-4 shrink-0" aria-hidden />
-        {!wallet
-          ? "Connect to share"
-          : claimed
-            ? "Come back in 24h"
-            : !live
-              ? "Pool empty"
-              : busy
-                ? "Working…"
-                : "Share and Unlock Rewards"}
-      </button>
-      {wallet && !claimed ? (
+      {claimable ? (
+        <button
+          type="button"
+          onClick={() => void onClaim()}
+          disabled={busy || !wallet || !farcasterWallet || claimed}
+          className="relative mt-3 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-[0.78rem] font-bold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.4)] disabled:opacity-50"
+        >
+          {busy
+            ? "Claiming…"
+            : !farcasterWallet
+              ? "Open in Farcaster to claim"
+              : "Claim 25 BQR"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void onShare()}
+          disabled={ctaDisabled && Boolean(wallet)}
+          className="relative mt-3 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-[0.78rem] font-bold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.4)] disabled:opacity-50"
+        >
+          <Share2 className="size-4 shrink-0" aria-hidden />
+          {!wallet
+            ? "Connect to share"
+            : claimed
+              ? "Come back in 24h"
+              : !live
+                ? "Pool empty"
+                : busy
+                  ? "Working…"
+                  : "Share and Unlock Rewards"}
+        </button>
+      )}
+      {wallet && !claimed && !claimable ? (
         <button
           type="button"
           onClick={() => void verifyShare()}
@@ -278,12 +400,12 @@ export default function ShareRewardsCard() {
       <ol className="relative mt-3 space-y-1.5 text-[0.72rem] text-white/55">
         <li>1. Share on Farcaster</li>
         <li>2. Verify the share</li>
-        <li>3. Receive your daily BQR reward</li>
+        <li>3. Claim 25 BQR from your Farcaster wallet (you pay Base gas)</li>
       </ol>
 
       <p className="relative mt-3 text-[0.65rem] leading-relaxed text-white/40">
-        Rewards are distributed once every 24 hours. BQR rewards are off-chain
-        in this phase — no wallet payout yet.
+        Rewards are paid on-chain once every 24 hours. A successful claim sends
+        25 BQR to the Farcaster Mini App wallet.
         {` Pool ${formatBqr(campaign.poolRemainingBqr)} remaining of ${formatBqr(campaign.poolConfiguredBqr)}.`}
       </p>
       {message ? (

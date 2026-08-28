@@ -405,6 +405,7 @@ export async function verifyDailyShareRewardRequest(
   verified: boolean;
   campaign: ShareRewardsCampaign;
   castHash: string | null;
+  qualifiedOnchain: boolean;
 }> {
   const response = await fetch("/api/tasks/share-rewards", {
     method: "POST",
@@ -420,6 +421,7 @@ export async function verifyDailyShareRewardRequest(
     verified?: boolean;
     campaign?: ShareRewardsCampaign;
     castHash?: string | null;
+    qualifiedOnchain?: boolean;
     error?: string;
     reason?: string | null;
   };
@@ -431,5 +433,39 @@ export async function verifyDailyShareRewardRequest(
     verified: Boolean(json.verified),
     campaign: json.campaign,
     castHash: json.castHash ?? null,
+    qualifiedOnchain: Boolean(json.qualifiedOnchain),
+  };
+}
+
+export async function confirmSharePoolClaimRequest(
+  wallet: string,
+  txHash: string,
+): Promise<{
+  alreadyPaid: boolean;
+  txHash: string;
+  amountBqr: number;
+  campaign: ShareRewardsCampaign;
+}> {
+  const response = await fetch("/api/tasks/share-rewards/claim", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet, txHash }),
+  });
+  const json = (await response.json()) as {
+    success?: boolean;
+    alreadyPaid?: boolean;
+    txHash?: string;
+    amountBqr?: number;
+    campaign?: ShareRewardsCampaign;
+    error?: string;
+  };
+  if (!response.ok || !json.success || !json.campaign || !json.txHash) {
+    throw new Error(json.error || "Unable to confirm share reward claim");
+  }
+  return {
+    alreadyPaid: Boolean(json.alreadyPaid),
+    txHash: json.txHash,
+    amountBqr: Number(json.amountBqr) || 25,
+    campaign: json.campaign,
   };
 }

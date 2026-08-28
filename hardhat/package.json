@@ -6,7 +6,8 @@
   "scripts": {
     "test": "hardhat test",
     "compile": "hardhat compile --build-profile production",
-    "fund:distributor": "hardhat run scripts/fundRewardsDistributor.ts --network base --build-profile production"
+    "fund:distributor": "hardhat run scripts/fundRewardsDistributor.ts --network base --build-profile production",
+    "fund:share-pool": "hardhat run scripts/fundBqrShareRewardsPool.ts --network base --build-profile production"
   },
   "keywords": [],
   "author": "",

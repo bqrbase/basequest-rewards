@@ -1,0 +1,39 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "contract": "BqrShareRewardsPool",
+  "testOnly": true,
+  "livePoolUntouched": "0x967EdCDcf74d6793F1c6d09a1056ec66481513cB",
+  "contractAddress": "0x75b99B36DDc4206A3c3A5d89436606e637003151",
+  "transactionHash": "0x62cb8bd92d9da9ae93126e30bc3e4ba3f7f312bcef4032716e04ac1e16b23f58",
+  "blockNumber": 50534687,
+  "deployer": "0x1819171c76D4B993ae6f14f43381b1Dfcd2AA09f",
+  "status": "success",
+  "constructorArguments": {
+    "initialOwner": "0xD34f706D5a5567FC0d45eFFa1623a37B66Ea41a2",
+    "bqrToken": "0xB200000000000000000000Bf7E6dcf0cF466939a"
+  },
+  "onChain": {
+    "owner": "0xD34f706D5a5567FC0d45eFFa1623a37B66Ea41a2",
+    "bqrToken": "0xB200000000000000000000Bf7E6dcf0cF466939a",
+    "tokenBalance": "0",
+    "totalPaid": "0",
+    "rewardAmount": "25000000000000000000",
+    "bytecodeBytes": 3510
+  },
+  "compiler": {
+    "version": "0.8.28",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "buildProfile": "production",
+    "evmVersion": "cancun"
+  },
+  "explorers": {
+    "address": "https://basescan.org/address/0x75b99B36DDc4206A3c3A5d89436606e637003151",
+    "tx": "https://basescan.org/tx/0x62cb8bd92d9da9ae93126e30bc3e4ba3f7f312bcef4032716e04ac1e16b23f58"
+  },
+  "verifiedOnBasescan": false,
+  "deployedAt": "2026-08-27T19:25:24.352Z"
+}

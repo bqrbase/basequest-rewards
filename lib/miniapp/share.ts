@@ -41,6 +41,11 @@ export function canonicalScoreUrl(): string {
   return `${MINI_APP_ORIGIN}/base-wallet-score`;
 }
 
+/** Standalone BQR Share Rewards page — My Stats, not the homepage or a task. */
+export function canonicalShareRewardsUrl(): string {
+  return `${MINI_APP_ORIGIN}/tasks/me`;
+}
+
 /** Static Task2Earn share preview scraped by Farcaster (not the Mini App action URL). */
 export function canonicalTaskShareImageUrl(_taskId?: string): string {
   return `${MINI_APP_ORIGIN}/share-cards/task2earn-share.png`;

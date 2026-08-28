@@ -73,7 +73,7 @@ function taskShareCastRow(): T2eRewardLedgerRow {
 }
 
 describe("standalone first credit", () => {
-  it("inserts one credited bqr_share_daily row for 25 BQR with null reference_id", () => {
+  it("inserts one pending bqr_share_daily row for 25 BQR with null reference_id", () => {
     const decided = decideStandaloneShareCredit([], {
       fid: FID,
       walletAddress: WALLET,
@@ -87,7 +87,7 @@ describe("standalone first credit", () => {
     assert.equal(decided.row.amount_bqr, 25);
     assert.equal(decided.row.reward_type, SHARE_REWARDS_REWARD_TYPE);
     assert.equal(decided.row.reference_id, null);
-    assert.equal(decided.row.status, "credited");
+    assert.equal(decided.row.status, "pending");
     assert.equal(decided.row.share_id, null);
     assert.equal(decided.row.claimed_at, null);
     assert.equal(decided.row.tx_hash, null);
@@ -177,22 +177,20 @@ describe("standalone different FID", () => {
   });
 });
 
-describe("standalone pool calculation", () => {
-  it("only counts bqr_share_daily credited rows against the 10,000 pool", () => {
+describe("pool remaining helper", () => {
+  it("only counts bqr_share_daily credited rows, not pending verifies", () => {
     const standalone = buildStandaloneLedgerInsert({
       fid: FID,
       walletAddress: WALLET,
       castHash: CAST_A,
       creditedAtIso: NOW,
     });
-    const credited = sumStandaloneCreditedBqr([
-      asLedger(standalone, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
-      taskShareCastRow(),
-    ]);
-    assert.equal(credited, 25);
-    assert.equal(BQR_SHARE_REWARDS_POOL_BQR - credited, 9_975);
-    assert.equal(BQR_SHARE_REWARDS_POOL_BQR, 10_000);
-    assert.equal(sumStandaloneCreditedBqr([taskShareCastRow()]), 0);
+    const pending = asLedger(standalone, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+    assert.equal(pending.status, "pending");
+    assert.equal(sumStandaloneCreditedBqr([pending, taskShareCastRow()]), 0);
+    const paid = { ...pending, status: "credited" as const, tx_hash: "0xabc" };
+    assert.equal(sumStandaloneCreditedBqr([paid, taskShareCastRow()]), 25);
+    assert.equal(BQR_SHARE_REWARDS_POOL_BQR - 25, 9_975);
     assert.equal(BQR_SHARE_REWARDS_POOL_BQR, 10_000);
   });
 });
@@ -319,50 +317,24 @@ describe("24-hour race", () => {
   });
 });
 
-describe("pool race", () => {
-  it("rejects a second concurrent claim that would exceed 10,000 BQR", () => {
+describe("pool remaining helper", () => {
+  it("does not treat pending verifies as paid pool usage", () => {
     const filled = 9_975;
     assert.equal(wouldExceedStandalonePool(filled, 25), false);
     assert.equal(wouldExceedStandalonePool(filled + 25, 25), true);
-    const existing: T2eRewardLedgerRow[] = [];
-    for (let i = 0; i < filled / 25; i += 1) {
-      existing.push({
-        ...asLedger(
-          buildStandaloneLedgerInsert({
-            fid: 1_000_000 + i,
-            walletAddress: `0x${(i + 1).toString(16).padStart(40, "0")}`,
-            castHash: `0xb${(i + 1).toString(16).padStart(39, "0")}`,
-            creditedAtIso: NOW,
-          }),
-          `${i.toString().padStart(8, "0")}-1111-4111-8111-111111111111`,
-        ),
-      });
-    }
-    assert.equal(sumStandaloneCreditedBqr(existing), filled);
-    const first = decideStandaloneShareCredit(existing, {
-      fid: FID,
-      walletAddress: WALLET,
-      castHash: CAST_A,
-      creditedAtIso: NOW,
-    });
-    assert.equal(first.ok && !first.alreadyClaimed, true);
-    if (!first.ok || first.alreadyClaimed) {
-      return;
-    }
-    const afterFirst = [
-      ...existing,
-      asLedger(first.row, "ffffffff-ffff-4fff-8fff-ffffffffffff"),
-    ];
-    const second = decideStandaloneShareCredit(afterFirst, {
-      fid: OTHER_FID,
-      walletAddress: OTHER_WALLET,
-      castHash: CAST_B,
-      creditedAtIso: NOW,
-    });
-    assert.equal(second.ok, false);
-    if (!second.ok) {
-      assert.equal(second.error, "pool_depleted");
-    }
+    const pending = asLedger(
+      buildStandaloneLedgerInsert({
+        fid: FID,
+        walletAddress: WALLET,
+        castHash: CAST_A,
+        creditedAtIso: NOW,
+      }),
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    assert.equal(pending.status, "pending");
+    assert.equal(sumStandaloneCreditedBqr([pending]), 0);
+    const paid = { ...pending, status: "credited" as const, tx_hash: "0xabc" };
+    assert.equal(sumStandaloneCreditedBqr([paid, taskShareCastRow()]), 25);
   });
 });
 
