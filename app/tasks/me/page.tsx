@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 export default function TaskStatsPage() {
   return (
-    <Task2EarnShell>
+    <Task2EarnShell showUnfundedNotice={false}>
       <ShareRewardsCard />
     </Task2EarnShell>
   );

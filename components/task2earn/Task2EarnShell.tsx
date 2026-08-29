@@ -5,9 +5,13 @@ import type { ReactNode } from "react";
 
 type Task2EarnShellProps = {
   children: ReactNode;
+  showUnfundedNotice?: boolean;
 };
 
-export default function Task2EarnShell({ children }: Task2EarnShellProps) {
+export default function Task2EarnShell({
+  children,
+  showUnfundedNotice = true,
+}: Task2EarnShellProps) {
   return (
     <PageShell>
       <div className="relative isolate">
@@ -19,7 +23,7 @@ export default function Task2EarnShell({ children }: Task2EarnShellProps) {
           <div className="absolute right-6 top-1 size-20 rounded-full bg-base-blue/20 blur-3xl" />
         </div>
         <div className="relative flex flex-col gap-2.5">
-          <UnfundedNotice />
+          {showUnfundedNotice ? <UnfundedNotice /> : null}
           <TaskNav />
           {children}
         </div>

@@ -284,9 +284,13 @@ export default function ShareRewardsCard() {
   const claimed = campaign.claimedToday;
   const claimable = campaign.claimable && !claimed;
   const ctaDisabled = busy || loading || !live || (claimed && !claimable);
+  const primaryCtaClass =
+    "relative mt-4 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl text-[0.78rem] font-bold uppercase tracking-[0.12em] disabled:opacity-50";
+  const activeCtaClass = `${primaryCtaClass} bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-white shadow-[0_10px_24px_rgba(124,58,237,0.4)]`;
+  const claimedCtaClass = `${primaryCtaClass} border border-white/12 bg-white/5 text-white/45`;
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-amber-300/20 bg-[linear-gradient(180deg,rgba(28,22,12,0.94),rgba(10,12,28,0.96))] p-3.5 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
+    <section className="relative overflow-hidden rounded-2xl border border-amber-300/20 bg-[linear-gradient(180deg,rgba(28,22,12,0.94),rgba(10,12,28,0.96))] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
       <div
         aria-hidden
         className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full bg-amber-400/15 blur-3xl"
@@ -306,7 +310,7 @@ export default function ShareRewardsCard() {
               BQR Share Rewards
             </h2>
             <p className="text-[0.72rem] text-white/50">
-              Free · Daily · Instant reward
+              Free · Daily · {formatBqr(campaign.dailyRewardBqr)}
             </p>
           </div>
         </div>
@@ -324,33 +328,36 @@ export default function ShareRewardsCard() {
         </span>
       </div>
 
-      <div className="relative mt-3 rounded-xl border border-amber-300/15 bg-black/30 px-3 py-3">
-        <p className="whitespace-pre-line text-[0.8rem] leading-relaxed text-white/90">
-          {shareRewardsCastText()}
+      <div className="relative mt-4 rounded-xl border border-white/10 bg-black/25 px-3.5 py-3">
+        <p className="font-sans text-xl font-bold tabular-nums tracking-tight text-white">
+          {formatBqr(campaign.poolConfiguredBqr)}
+        </p>
+        <p className="mt-0.5 text-[0.58rem] font-bold uppercase tracking-[0.16em] text-white/40">
+          Total Reward Pool
         </p>
       </div>
 
-      <div className="relative mt-3 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
-        <p className="text-[0.58rem] font-bold uppercase tracking-[0.16em] text-white/40">
-          Your reward today
-        </p>
-        {claimed && campaign.nextEligibleAt ? (
-          <div className="mt-1">
-            <p className="font-sans text-lg font-bold text-emerald-100">
-              Claimed
+      <div className="relative mt-2.5 rounded-xl border border-amber-300/20 bg-black/30 px-3.5 py-3.5">
+        {claimed ? (
+          <div>
+            <p className="font-sans text-2xl font-bold tracking-tight text-emerald-100">
+              CLAIMED ✓
             </p>
-            <p className="text-[0.72rem] text-white/50">
-              Next eligible in {formatShareRewardCountdown(campaign.nextEligibleAt)}
+            {campaign.nextEligibleAt ? (
+              <p className="mt-1 text-[0.72rem] text-white/50">
+                Next reward in {formatShareRewardCountdown(campaign.nextEligibleAt)}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div>
+            <p className="font-sans text-3xl font-bold tabular-nums tracking-tight text-amber-50">
+              {formatBqr(campaign.dailyRewardBqr)}
+            </p>
+            <p className="mt-0.5 text-[0.58rem] font-bold uppercase tracking-[0.16em] text-white/40">
+              Your Reward
             </p>
           </div>
-        ) : claimable ? (
-          <p className="mt-1 font-sans text-lg font-bold text-amber-50">
-            Ready to claim {formatBqr(campaign.dailyRewardBqr)}
-          </p>
-        ) : (
-          <p className="mt-1 font-sans text-lg font-bold text-amber-50">
-            {formatBqr(campaign.dailyRewardBqr)}
-          </p>
         )}
       </div>
 
@@ -359,7 +366,7 @@ export default function ShareRewardsCard() {
           type="button"
           onClick={() => void onClaim()}
           disabled={busy || !wallet || !farcasterWallet || claimed}
-          className="relative mt-3 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-[0.78rem] font-bold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.4)] disabled:opacity-50"
+          className={activeCtaClass}
         >
           {busy
             ? "Claiming…"
@@ -372,18 +379,18 @@ export default function ShareRewardsCard() {
           type="button"
           onClick={() => void onShare()}
           disabled={ctaDisabled && Boolean(wallet)}
-          className="relative mt-3 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-base-blue text-[0.78rem] font-bold uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(124,58,237,0.4)] disabled:opacity-50"
+          className={claimed ? claimedCtaClass : activeCtaClass}
         >
-          <Share2 className="size-4 shrink-0" aria-hidden />
+          {claimed ? null : <Share2 className="size-4 shrink-0" aria-hidden />}
           {!wallet
             ? "Connect to share"
             : claimed
-              ? "Come back in 24h"
+              ? "Come Back in 24h"
               : !live
                 ? "Pool empty"
                 : busy
                   ? "Working…"
-                  : "Share and Unlock Rewards"}
+                  : "Share & Unlock Rewards"}
         </button>
       )}
       {wallet && !claimed && !claimable ? (
@@ -391,25 +398,37 @@ export default function ShareRewardsCard() {
           type="button"
           onClick={() => void verifyShare()}
           disabled={busy || !live}
-          className="relative mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-amber-300/30 bg-amber-500/10 text-[0.7rem] font-semibold uppercase tracking-wide text-amber-100 disabled:opacity-50"
+          className="relative mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-xl border border-white/10 text-[0.68rem] font-semibold text-white/55 disabled:opacity-50"
         >
-          {busy ? "Verifying…" : "Verify share"}
+          {busy ? "Verifying…" : "Verify"}
         </button>
       ) : null}
 
-      <ol className="relative mt-3 space-y-1.5 text-[0.72rem] text-white/55">
-        <li>1. Share on Farcaster</li>
-        <li>2. Verify the share</li>
-        <li>3. Claim 25 BQR from your Farcaster wallet (you pay Base gas)</li>
-      </ol>
+      {!claimed ? (
+        <ol className="relative mt-3 flex flex-col gap-1 text-[0.65rem] text-white/40">
+          <li className="flex items-center gap-2">
+            <span className="inline-flex size-4 shrink-0 items-center justify-center text-[0.58rem] font-bold text-white/25">
+              1
+            </span>
+            Share on Farcaster
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="inline-flex size-4 shrink-0 items-center justify-center text-[0.58rem] font-bold text-white/25">
+              2
+            </span>
+            Verify
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="inline-flex size-4 shrink-0 items-center justify-center text-[0.58rem] font-bold text-white/25">
+              3
+            </span>
+            Claim {formatBqr(campaign.dailyRewardBqr)}
+          </li>
+        </ol>
+      ) : null}
 
-      <p className="relative mt-3 text-[0.65rem] leading-relaxed text-white/40">
-        Rewards are paid on-chain once every 24 hours. A successful claim sends
-        25 BQR to the Farcaster Mini App wallet.
-        {` Pool ${formatBqr(campaign.poolRemainingBqr)} remaining of ${formatBqr(campaign.poolConfiguredBqr)}.`}
-      </p>
       {message ? (
-        <p className="relative mt-2 text-[0.7rem] text-cyan-100/85" role="status">
+        <p className="relative mt-3 text-[0.7rem] text-cyan-100/85" role="status">
           {message}
         </p>
       ) : null}
