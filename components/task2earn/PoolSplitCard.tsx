@@ -40,7 +40,7 @@ export default function PoolSplitCard({
         {estimated}
       </p>
       <p className="mt-1 text-[0.7rem] font-semibold uppercase tracking-wide text-amber-200/70">
-        {campaignEnded ? "Final split pending escrow" : "ESTIMATED until campaign ends"}
+        {campaignEnded ? "Final split pending" : "ESTIMATED until campaign ends"}
       </p>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-white/45">
         Not funded or claimable. {parseNumericAmount(poolAmount) === 0

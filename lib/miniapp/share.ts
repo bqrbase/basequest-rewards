@@ -151,8 +151,7 @@ export function taskCastText(input: TaskCastShareInput | string): string {
     return [
       `Join this Task2Earn: ${trimmed} 🚀`,
       "🎯 Complete the task",
-      "💰 Earn rewards",
-      "👇 Complete the task and earn your reward!",
+      "👇 Join this campaign on BaseQuest Rewards",
     ].join("\n");
   }
   const title = input.title.trim() || "this campaign";
@@ -162,10 +161,9 @@ export function taskCastText(input: TaskCastShareInput | string): string {
   return [
     `Join this Task2Earn: ${title} 🚀`,
     "🎯 Complete the task",
-    "💰 Earn rewards",
     `⚡ ${token} reward pool: ${pool}`,
     `⏱️ Duration: ${days} day(s)`,
-    "👇 Complete the task and earn your reward!",
+    "👇 Join this campaign on BaseQuest Rewards",
   ].join("\n");
 }
 

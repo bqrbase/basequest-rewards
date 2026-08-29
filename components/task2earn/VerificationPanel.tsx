@@ -110,7 +110,7 @@ export default function VerificationPanel({
         <div className="mt-4 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-3 py-3">
           <p className="text-sm font-semibold text-emerald-100">Verified participant</p>
           <p className="mt-1 text-[0.75rem] leading-relaxed text-white/55">
-            Reward will be calculated after the campaign ends.
+            Task verified successfully.
           </p>
         </div>
       ) : null}
