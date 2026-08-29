@@ -6,11 +6,6 @@ import {
   requestShareCastReward,
 } from "@/lib/task2earn/client";
 import {
-  SHARE_CAST_REWARD_BQR,
-  T2E_EARNED_BQR_LABEL,
-} from "@/lib/task2earn/constants";
-import { formatTokenAmount } from "@/lib/task2earn/display";
-import {
   canonicalScoreUrl,
   canonicalTaskUrl,
   farcasterComposeUrl,
@@ -123,17 +118,17 @@ async function fetchNeynarScore(address: string): Promise<number | null> {
 function shareRewardMessage(error: string): string {
   switch (error) {
     case "creator_ineligible":
-      return "Creators cannot earn BQR for sharing their own task.";
+      return "Creators cannot share their own task for verification.";
     case "share_cast_disabled":
-      return "Share Cast rewards are not enabled for this task.";
+      return "Share Cast is not enabled for this task.";
     case "task_cancelled":
       return "This task is cancelled.";
     case "task_not_shareable":
-      return "This task is not eligible for Share Cast rewards.";
+      return "This task is not eligible for Share Cast.";
     case "farcaster_required":
       return "Connect a Farcaster-linked wallet to verify this share.";
     case "already_credited":
-      return "This Farcaster account already earned the Share Cast reward for this task.";
+      return "This Farcaster account already verified a share for this task.";
     case "valid_wallet_required":
       return "Connect a wallet to verify this share.";
     case "missing_cast":
@@ -157,9 +152,9 @@ function shareRewardMessage(error: string): string {
     case "unfetchable":
       return "The cast could not be fetched. Try Verify Share again.";
     case "proof_failed":
-      return "Share Cast was not verified. No BQR was awarded.";
+      return "Share Cast was not verified.";
     default:
-      return "Share Cast was not verified. No BQR was awarded.";
+      return "Share Cast was not verified.";
   }
 }
 
@@ -171,7 +166,6 @@ export default function ShareActions({
   durationDays,
   shareCastEnabled = true,
   shareSnapEnabled = true,
-  shareSnapRewardBqr = "0",
   compact = false,
 }: ShareActionsProps) {
   const [message, setMessage] = useState<string | null>(null);
@@ -215,7 +209,7 @@ export default function ShareActions({
   const verifyShare = useCallback(
     async (castHash?: string | null) => {
       if (!taskId) {
-        setMessage("Create the task before verifying a Share Cast reward.");
+        setMessage("Create the task before verifying a Share Cast.");
         return;
       }
       if (!address) {
@@ -228,9 +222,7 @@ export default function ShareActions({
         setLastCredit(result.amountBqr);
         setEarnedBqr(result.earnedBqr);
         setMessage(
-          result.alreadyCredited
-            ? `Already credited. ${T2E_EARNED_BQR_LABEL}: ${result.earnedBqr} BQR.`
-            : `+${result.amountBqr} BQR earned. ${T2E_EARNED_BQR_LABEL}: ${result.earnedBqr} BQR.`,
+          result.alreadyCredited ? "Already verified." : "Share verified.",
         );
       } catch (error) {
         setLastCredit(null);
@@ -253,7 +245,7 @@ export default function ShareActions({
     if (!composed.openedInMiniApp) {
       openBrowserComposer(castText, taskUrl);
       setMessage(
-        "Publish the cast, then tap Verify Share. Opening the composer does not award BQR.",
+        "Publish the cast, then tap Verify Share. Opening the composer does not verify the share.",
       );
       return;
     }
@@ -262,7 +254,7 @@ export default function ShareActions({
       return;
     }
     setMessage(
-      "Publish the cast, then tap Verify Share. Opening the composer does not award BQR.",
+      "Publish the cast, then tap Verify Share. Opening the composer does not verify the share.",
     );
   }, [castText, taskUrl, verifyShare]);
 
@@ -277,7 +269,7 @@ export default function ShareActions({
       walletScore: liveWalletScore,
     });
     setMessage(
-      "Share your scores — Farcaster has no Snap API. Composer only. No BQR awarded.",
+      "Share your Wallet Score — Farcaster has no Snap API. Composer only.",
     );
     const opened = await openFarcasterComposer(snapText, scoreUrl);
     if (!opened) {
@@ -297,23 +289,23 @@ export default function ShareActions({
         {shareCastEnabled ? (
           <button
             type="button"
-            title="Share this Task2Earn campaign"
+            title="Share your progress"
             onClick={() => void onCast()}
             className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/20 px-3 text-[0.7rem] font-semibold uppercase tracking-wide text-violet-100"
           >
             <Share2 className="size-3.5 shrink-0" aria-hidden />
-            Share Cast
+            Share your progress
           </button>
         ) : null}
         {shareSnapEnabled ? (
           <button
             type="button"
-            title="Share your social reputation scores"
+            title="Share your Wallet Score"
             onClick={() => void onSnap()}
             className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-teal-400/40 bg-teal-500/20 px-3 text-[0.7rem] font-semibold uppercase tracking-wide text-emerald-100"
           >
             <Gauge className="size-3.5 shrink-0" aria-hidden />
-            Share Snap
+            Share Wallet Score
           </button>
         ) : null}
       </div>
@@ -330,26 +322,8 @@ export default function ShareActions({
       ) : null}
       {!compact && (shareCastEnabled || shareSnapEnabled) ? (
         <p className="text-[0.65rem] text-white/40">
-          {shareCastEnabled
-            ? `Share Cast: share this Task2Earn campaign, then verify to earn ${SHARE_CAST_REWARD_BQR} BQR off-chain. `
-            : ""}
-          {shareSnapEnabled
-            ? "Share Snap: share your social reputation scores. "
-            : ""}
-          {shareSnapEnabled
-            ? ` Snap intent ${formatTokenAmount(shareSnapRewardBqr, "BQR")}.`
-            : ""}{" "}
-          Share Snap is not transferred.
-        </p>
-      ) : null}
-      {lastCredit !== null ? (
-        <p className="text-[0.75rem] font-semibold text-emerald-200">
-          +{lastCredit} BQR earned
-        </p>
-      ) : null}
-      {earnedBqr !== null ? (
-        <p className="text-[0.65rem] text-cyan-100/80">
-          {T2E_EARNED_BQR_LABEL}: {earnedBqr} BQR
+          {shareCastEnabled ? "Share your progress, then verify. " : ""}
+          {shareSnapEnabled ? "Share your Wallet Score." : ""}
         </p>
       ) : null}
       {message ? (
