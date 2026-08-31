@@ -125,6 +125,23 @@ export default function ShareRewardsCard() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!wallet || !campaign.nextEligibleAt) {
+      return;
+    }
+    const nextEligibleMs = Date.parse(campaign.nextEligibleAt);
+    if (!Number.isFinite(nextEligibleMs)) {
+      return;
+    }
+    const delay = Math.max(0, nextEligibleMs - Date.now());
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, delay + 500);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [campaign.nextEligibleAt, refresh, wallet]);
+
   const verifyShare = useCallback(
     async (castHash?: string | null) => {
       if (!wallet) {
