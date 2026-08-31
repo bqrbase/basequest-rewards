@@ -244,3 +244,8 @@ export function isJoinableStatus(status: TaskStatus, endsAtIso: string): boolean
   }
   return Date.parse(endsAtIso) > Date.now();
 }
+
+export {
+  joinedTaskSection,
+  type JoinedTaskSection,
+} from "./joined-section";

@@ -26,8 +26,19 @@ export type FarcasterUserOption = {
   pfpUrl: string | null;
 };
 
-export async function fetchMarketplaceTasks(): Promise<TaskMarketplaceItem[]> {
-  const response = await fetch("/api/tasks", { cache: "no-store" });
+export async function fetchMarketplaceTasks(options?: {
+  wallet?: string;
+  scope?: "joined";
+}): Promise<TaskMarketplaceItem[]> {
+  const params = new URLSearchParams();
+  if (options?.scope === "joined" && options.wallet) {
+    params.set("scope", "joined");
+    params.set("wallet", options.wallet);
+  }
+  const query = params.toString();
+  const response = await fetch(`/api/tasks${query ? `?${query}` : ""}`, {
+    cache: "no-store",
+  });
   const json = (await response.json()) as {
     success?: boolean;
     tasks?: TaskMarketplaceItem[];

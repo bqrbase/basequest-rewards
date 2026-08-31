@@ -35,6 +35,7 @@ export {
   getActiveAudienceFilters,
   getTaskRequirements,
   isJoinableStatus,
+  joinedTaskSection,
   remainingTimeLabel,
 } from "@/lib/task2earn/display";
 

@@ -178,6 +178,8 @@ export type TaskMarketplaceItem = Task2EarnTask & {
   participantCount: number;
   verifiedCount: number;
   estimatedRewardPerUser: string | null;
+  /** Present on joined-task lists. Omitted from the public marketplace. */
+  viewerParticipantStatus?: ParticipantStatus | null;
 };
 
 export type TaskDetailPayload = TaskMarketplaceItem & {

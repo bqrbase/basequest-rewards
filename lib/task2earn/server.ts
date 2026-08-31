@@ -220,6 +220,121 @@ export async function listMarketplaceTasks(): Promise<TaskMarketplaceItem[]> {
   });
 }
 
+function participantStatusFromRow(status: string): ParticipantStatus {
+  if (status === "verified" || status === "rejected") {
+    return status;
+  }
+  return "joined";
+}
+
+/**
+ * Tasks this wallet has joined, including ended campaigns.
+ * Does not change the public marketplace list.
+ */
+export async function listJoinedTasks(
+  walletAddress: string,
+): Promise<TaskMarketplaceItem[]> {
+  const supabase = requireAdmin();
+  const wallet = walletAddress.toLowerCase();
+
+  const { data: joinedRows, error: joinedError } = await supabase
+    .from(T2E_TABLES.participants)
+    .select("task_id, status, joined_at")
+    .eq("wallet_address", wallet)
+    .order("joined_at", { ascending: false });
+
+  if (joinedError) {
+    if (isMissingSchemaError(joinedError)) {
+      return [];
+    }
+    logSupabaseError("listJoinedTasks", "select participants", joinedError, {
+      wallet,
+    });
+    throw joinedError;
+  }
+
+  const statusByTask = new Map<string, ParticipantStatus>();
+  const taskIds: string[] = [];
+  for (const row of joinedRows ?? []) {
+    const taskId = String((row as { task_id: string }).task_id);
+    if (statusByTask.has(taskId)) {
+      continue;
+    }
+    taskIds.push(taskId);
+    statusByTask.set(
+      taskId,
+      participantStatusFromRow(String((row as { status: string }).status)),
+    );
+  }
+
+  if (taskIds.length === 0) {
+    return [];
+  }
+
+  const { data: taskRows, error: taskError } = await supabase
+    .from(T2E_TABLES.tasks)
+    .select("*")
+    .in("id", taskIds);
+
+  if (taskError) {
+    if (isMissingSchemaError(taskError)) {
+      return [];
+    }
+    logSupabaseError("listJoinedTasks", "select tasks", taskError, { wallet });
+    throw taskError;
+  }
+
+  const tasks = ((taskRows ?? []) as T2eTaskRow[])
+    .map(mapTaskRow)
+    .filter((task): task is Task2EarnTask => Boolean(task));
+
+  if (tasks.length === 0) {
+    return [];
+  }
+
+  const listedIds = tasks.map((task) => task.id);
+  const { data: participantRows, error: participantError } = await supabase
+    .from(T2E_TABLES.participants)
+    .select("task_id, status")
+    .in("task_id", listedIds);
+
+  if (participantError) {
+    logSupabaseError(
+      "listJoinedTasks",
+      "select participant counts",
+      participantError,
+      { wallet },
+    );
+    throw participantError;
+  }
+
+  const counts = new Map<string, { total: number; verified: number }>();
+  for (const row of participantRows ?? []) {
+    const taskId = String((row as { task_id: string }).task_id);
+    const current = counts.get(taskId) ?? { total: 0, verified: 0 };
+    current.total += 1;
+    if ((row as { status: string }).status === "verified") {
+      current.verified += 1;
+    }
+    counts.set(taskId, current);
+  }
+
+  const joinOrder = new Map(taskIds.map((id, index) => [id, index]));
+  return tasks
+    .map((task) => {
+      const count = counts.get(task.id) ?? { total: 0, verified: 0 };
+      return {
+        ...withCounts(task, count.total, count.verified),
+        viewerParticipantStatus: statusByTask.get(task.id) ?? "joined",
+      };
+    })
+    .sort(
+      (left, right) =>
+        (joinOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+        (joinOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+}
+
 export async function getMarketplaceTask(
   taskId: string,
   viewerWallet?: string,

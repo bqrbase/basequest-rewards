@@ -61,7 +61,7 @@ export default function TaskNav() {
 const SUB_NAV = [
   { href: "/tasks", label: "Tasks" },
   { href: "/tasks/leaders", label: "Board" },
-  { href: "/tasks/me", label: "My Tasks" },
+  { href: "/tasks/joined", label: "My Tasks" },
 ] as const;
 
 export function MarketplaceSubNav() {

@@ -6,12 +6,16 @@ import TaskFilters, {
 } from "@/components/task2earn/TaskFilters";
 import { MarketplaceSubNav } from "@/components/task2earn/TaskNav";
 import { fetchMarketplaceTasks, joinTaskRequest } from "@/lib/task2earn/client";
-import { isJoinableStatus } from "@/lib/task2earn/display";
+import { isJoinableStatus, joinedTaskSection } from "@/lib/task2earn/display";
 import type { TaskMarketplaceItem } from "@/lib/task2earn/types";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useAccount } from "wagmi";
+
+type TaskMarketplaceProps = {
+  scope?: "marketplace" | "joined";
+};
 
 function marketplaceStatus(
   task: TaskMarketplaceItem,
@@ -28,8 +32,13 @@ function marketplaceStatus(
 function filterTasks(
   tasks: TaskMarketplaceItem[],
   status: MarketplaceStatusFilter,
+  scope: "marketplace" | "joined",
 ): TaskMarketplaceItem[] {
-  return tasks.filter((task) => marketplaceStatus(task) === status);
+  return tasks.filter((task) =>
+    scope === "joined"
+      ? joinedTaskSection(task) === status
+      : marketplaceStatus(task) === status,
+  );
 }
 
 function CreateTaskCta() {
@@ -67,23 +76,30 @@ function EmptyState({
   );
 }
 
-export default function TaskMarketplace() {
+export default function TaskMarketplace({
+  scope = "marketplace",
+}: TaskMarketplaceProps) {
   const { address, status } = useAccount();
   const wallet = status === "connected" && address ? address : null;
   const [section, setSection] = useState<MarketplaceStatusFilter>("ongoing");
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
   const [joinHint, setJoinHint] = useState<string | null>(null);
+  const joinedScope = scope === "joined";
 
   const tasksQuery = useQuery({
-    queryKey: ["t2e-tasks"],
-    queryFn: fetchMarketplaceTasks,
+    queryKey: joinedScope ? ["t2e-joined-tasks", wallet] : ["t2e-tasks"],
+    queryFn: () =>
+      joinedScope && wallet
+        ? fetchMarketplaceTasks({ scope: "joined", wallet })
+        : fetchMarketplaceTasks(),
+    enabled: joinedScope ? Boolean(wallet) : true,
     staleTime: 15_000,
     retry: 1,
   });
 
   const tasks = tasksQuery.data ?? [];
-  const visible = filterTasks(tasks, section);
+  const visible = filterTasks(tasks, section, scope);
 
   const onJoin = useCallback(
     async (taskId: string) => {
@@ -116,7 +132,14 @@ export default function TaskMarketplace() {
   );
 
   let body;
-  if (tasksQuery.isPending) {
+  if (joinedScope && !wallet) {
+    body = (
+      <EmptyState
+        title="Connect your wallet"
+        subtitle="Joined campaigns for this wallet show up here."
+      />
+    );
+  } else if (tasksQuery.isPending) {
     body = (
       <div className="grid grid-cols-1 gap-2">
         {Array.from({ length: 2 }, (_, index) => (
@@ -139,16 +162,28 @@ export default function TaskMarketplace() {
     body = (
       <EmptyState
         title={
-          section === "ongoing" || tasks.length === 0
-            ? "No live tasks yet"
-            : section === "completed"
-              ? "No completed tasks yet"
-              : "No ended tasks yet"
+          joinedScope
+            ? tasks.length === 0
+              ? "You haven't joined any tasks yet"
+              : section === "ongoing"
+                ? "No ongoing tasks you've joined"
+                : section === "completed"
+                  ? "No completed tasks yet"
+                  : "No ended tasks yet"
+            : section === "ongoing" || tasks.length === 0
+              ? "No live tasks yet"
+              : section === "completed"
+                ? "No completed tasks yet"
+                : "No ended tasks yet"
         }
         subtitle={
-          section === "ongoing" || tasks.length === 0
-            ? "Be the first to launch a campaign."
-            : "Check Ongoing for live campaigns."
+          joinedScope
+            ? tasks.length === 0
+              ? "Join a live campaign from Tasks."
+              : "Check Ongoing for campaigns still in progress."
+            : section === "ongoing" || tasks.length === 0
+              ? "Be the first to launch a campaign."
+              : "Check Ongoing for live campaigns."
         }
       />
     );
@@ -161,7 +196,11 @@ export default function TaskMarketplace() {
             task={task}
             onJoin={onJoin}
             joining={joiningId === task.id}
-            joined={joinedIds.includes(task.id)}
+            joined={
+              joinedScope ||
+              joinedIds.includes(task.id) ||
+              Boolean(task.viewerParticipantStatus)
+            }
           />
         ))}
       </div>

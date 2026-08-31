@@ -1,4 +1,8 @@
-import { createDraftTask, listMarketplaceTasks } from "@/lib/task2earn/server";
+import {
+  createDraftTask,
+  listJoinedTasks,
+  listMarketplaceTasks,
+} from "@/lib/task2earn/server";
 import {
   isValidWalletAddress,
   normalizeWalletAddress,
@@ -7,10 +11,25 @@ import { NextResponse } from "next/server";
 
 /**
  * GET /api/tasks
- * Public marketplace list. Configured pool amounts only — not funded.
+ * Public marketplace list by default. Pass scope=joined&wallet= to list
+ * campaigns this wallet has joined (including ended), not Share Rewards.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const scope = url.searchParams.get("scope");
+    if (scope === "joined") {
+      const rawWallet = url.searchParams.get("wallet");
+      if (!rawWallet || !isValidWalletAddress(rawWallet)) {
+        return NextResponse.json(
+          { success: false, error: "valid_wallet_required" },
+          { status: 400 },
+        );
+      }
+      const tasks = await listJoinedTasks(normalizeWalletAddress(rawWallet));
+      return NextResponse.json({ success: true, tasks });
+    }
+
     const tasks = await listMarketplaceTasks();
     return NextResponse.json({ success: true, tasks });
   } catch (error) {
