@@ -418,6 +418,19 @@ describe("applySharePoolAuthorizationToCampaign", () => {
     assert.equal(success.campaign.claimable, true);
     assert.equal(success.qualifiedOnchain, true);
 
+    const gated = applySharePoolAuthorizationToCampaign(
+      { ...campaign, claimable: false },
+      {
+        ok: true,
+        skipped: false,
+        reason: "authorized",
+        txHash: TX,
+      },
+    );
+    assert.equal(gated.campaign.claimable, true);
+    assert.equal(gated.campaign.claimFid, FID);
+    assert.equal(gated.qualifiedOnchain, true);
+
     const failure = applySharePoolAuthorizationToCampaign(campaign, {
       ok: false,
       skipped: false,

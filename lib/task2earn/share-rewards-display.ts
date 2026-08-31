@@ -146,6 +146,12 @@ export function suppressShareRewardClaimable(
   };
 }
 
+export {
+  applySharePoolPendingClaimGate,
+  finalizeShareRewardsCampaign,
+} from "./share-rewards-pending-gate";
+export type { SharePoolPendingClaimOnChain } from "./share-rewards-pending-gate";
+
 /** Local UI state immediately after a successful on-chain claim receipt. */
 export function campaignAfterSuccessfulClaim(
   campaign: ShareRewardsCampaign,

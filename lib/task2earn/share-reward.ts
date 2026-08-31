@@ -30,8 +30,8 @@ import {
   buildStandaloneLedgerInsert,
 } from "@/lib/task2earn/share-reward-logic";
 import {
-  applyOnChainShareRewardCooldown,
   buildShareRewardsCampaign,
+  finalizeShareRewardsCampaign,
   latestPaidAt,
   nextShareRewardEligibleAt,
   type ShareRewardsCampaign,
@@ -55,7 +55,14 @@ import {
 import type { Task2EarnEarnedRewards } from "@/lib/task2earn/types";
 import { normalizeWalletAddress } from "@/lib/x/config";
 import { BQR_SHARE_REWARDS_POOL_ABI } from "@/lib/contracts/abi/BqrShareRewardsPool";
-import { getBqrShareRewardsPoolAddress, resolveShareRewardsClaimPoolAddress } from "@/lib/contracts/shareRewardsPool";
+import {
+  BQR_SHARE_REWARDS_POOL_PRODUCTION_ADDRESS,
+  getBqrShareRewardsPoolAddress,
+  parseBqrShareRewardsPoolProductionAddress,
+  resolveShareRewardsClaimPoolAddress,
+  toSharePoolCastHash,
+} from "@/lib/contracts/shareRewardsPool";
+import { getAddress, type Address } from "viem";
 import { getBasePublicClient } from "@/lib/rewards/server/baseClient";
 import {
   isStandalonePendingRow,
@@ -694,6 +701,100 @@ async function readSharePoolFidNextEligibleAt(
   }
 }
 
+const SHARE_POOL_CLAIM_STATE_ABI = [
+  {
+    type: "function",
+    name: "getClaimId",
+    stateMutability: "pure",
+    inputs: [
+      { name: "account", type: "address" },
+      { name: "fid", type: "uint256" },
+      { name: "castHash", type: "bytes32" },
+    ],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
+  {
+    type: "function",
+    name: "isClaimIdUsed",
+    stateMutability: "view",
+    inputs: [{ name: "claimId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "isAuthorized",
+    stateMutability: "view",
+    inputs: [{ name: "claimId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
+
+function sharePoolRequiresAuthorization(pool: Address): boolean {
+  const resolved = getAddress(pool);
+  if (resolved === getAddress(BQR_SHARE_REWARDS_POOL_PRODUCTION_ADDRESS)) {
+    return true;
+  }
+  try {
+    const configured = parseBqrShareRewardsPoolProductionAddress();
+    return configured !== null && resolved === configured;
+  } catch {
+    return false;
+  }
+}
+
+async function readSharePoolClaimIdState(params: {
+  account: string;
+  fid: number;
+  castHash: string;
+}): Promise<{
+  used: boolean | null;
+  authorized: boolean | null;
+  requireAuthorization: boolean;
+}> {
+  const pool = getBqrShareRewardsPoolAddress();
+  const requireAuthorization = Boolean(
+    pool && sharePoolRequiresAuthorization(pool),
+  );
+  if (!pool || !Number.isInteger(params.fid) || params.fid <= 0) {
+    return { used: null, authorized: null, requireAuthorization };
+  }
+  try {
+    const account = getAddress(params.account);
+    const castHash = toSharePoolCastHash(params.castHash);
+    const client = getBasePublicClient();
+    const claimId = await client.readContract({
+      address: pool,
+      abi: SHARE_POOL_CLAIM_STATE_ABI,
+      functionName: "getClaimId",
+      args: [account, BigInt(params.fid), castHash],
+    });
+    const used = await client.readContract({
+      address: pool,
+      abi: SHARE_POOL_CLAIM_STATE_ABI,
+      functionName: "isClaimIdUsed",
+      args: [claimId],
+    });
+    let authorized: boolean | null = null;
+    if (requireAuthorization) {
+      try {
+        authorized = await client.readContract({
+          address: pool,
+          abi: SHARE_POOL_CLAIM_STATE_ABI,
+          functionName: "isAuthorized",
+          args: [claimId],
+        });
+      } catch (error) {
+        console.error("[task2earn] share pool isAuthorized read failed", error);
+        authorized = null;
+      }
+    }
+    return { used, authorized, requireAuthorization };
+  } catch (error) {
+    console.error("[task2earn] share pool claimId state read failed", error);
+    return { used: null, authorized: null, requireAuthorization };
+  }
+}
+
 function fidFromStandaloneRows(rows: T2eRewardLedgerRow[]): number | null {
   for (const row of rows) {
     if (
@@ -749,12 +850,38 @@ export async function getShareRewardsCampaign(
       creditedPoolBqr,
       onChainRemaining,
     );
+    const pending = rows.find((row) => isStandalonePendingRow(row)) ?? null;
     const fid = campaign.claimFid ?? fidFromStandaloneRows(rows);
     const onChainNextEligibleAt = fid
       ? await readSharePoolFidNextEligibleAt(fid)
       : null;
+    const pool = getBqrShareRewardsPoolAddress();
+    let claimIdUsed: boolean | null = null;
+    let claimIdAuthorized: boolean | null = null;
+    const requireAuthorization = Boolean(
+      pool && sharePoolRequiresAuthorization(pool),
+    );
+    if (
+      pending &&
+      pending.fid &&
+      pending.cast_hash &&
+      pending.wallet_address
+    ) {
+      const state = await readSharePoolClaimIdState({
+        account: pending.wallet_address,
+        fid: pending.fid,
+        castHash: pending.cast_hash,
+      });
+      claimIdUsed = state.used;
+      claimIdAuthorized = state.authorized;
+    }
     return attachClaimPoolAddress(
-      applyOnChainShareRewardCooldown(campaign, onChainNextEligibleAt),
+      finalizeShareRewardsCampaign(campaign, {
+        onChainNextEligibleAt,
+        claimIdUsed,
+        claimIdAuthorized,
+        requireAuthorization,
+      }),
     );
   } catch (error) {
     if (isMissingLedgerError(error)) {
@@ -820,7 +947,13 @@ export async function verifyDailyShareReward(
   const authorizeShare = deps?.authorizeVerifiedShare ?? authorizeVerifiedShare;
   const latestActivity = await loadLatestStandaloneActivityAtForFid(fid);
   const campaign = await getShareRewardsCampaign(parsed.wallet);
-  if (campaign.claimable) {
+  const pendingVerifiedShare = Boolean(
+    campaign.claimFid &&
+      campaign.claimCastHash &&
+      campaign.qualifiedWallet &&
+      !campaign.claimedToday,
+  );
+  if (campaign.claimable || pendingVerifiedShare) {
     const decision = shouldAuthorizeVerifiedShare({
       proofOk: true,
       alreadyClaimable: true,

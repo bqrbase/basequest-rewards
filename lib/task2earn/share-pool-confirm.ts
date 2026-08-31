@@ -21,6 +21,7 @@ import {
 } from "@/lib/task2earn/share-pool-flow";
 import { SHARE_REWARDS_REWARD_TYPE } from "@/lib/task2earn/constants";
 import { getAddress, isHash, parseEventLogs, type Address, type Hash, type Hex, type Log } from "viem";
+import { normalizeWalletAddress } from "@/lib/x/config";
 
 export type ConfirmSharePoolClaimResult =
   | {
@@ -94,10 +95,11 @@ export async function confirmSharePoolClaim(params: {
 
   const supabase = requireAdmin();
   const wallet = getAddress(params.walletAddress);
+  const walletKey = normalizeWalletAddress(params.walletAddress);
   const { data, error } = await supabase
     .from(T2E_TABLES.rewardLedger)
     .select("*")
-    .eq("wallet_address", wallet)
+    .eq("wallet_address", walletKey)
     .eq("reward_type", SHARE_REWARDS_REWARD_TYPE)
     .order("created_at", { ascending: false });
   if (error) {

@@ -344,7 +344,16 @@ export function applySharePoolAuthorizationToCampaign(
     return { campaign, qualifiedOnchain: false };
   }
   if (auth.ok) {
-    return { campaign, qualifiedOnchain: true };
+    const hasPendingIdentity = Boolean(
+      campaign.claimFid && campaign.claimCastHash && campaign.qualifiedWallet,
+    );
+    return {
+      campaign: {
+        ...campaign,
+        claimable: hasPendingIdentity,
+      },
+      qualifiedOnchain: true,
+    };
   }
   return {
     campaign: suppressShareRewardClaimable(campaign),
